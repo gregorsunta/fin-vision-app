@@ -4,7 +4,7 @@
   import { apiClient } from '$lib/api/client';
   import Card from '$lib/components/Card.svelte';
   import Button from '$lib/components/Button.svelte';
-  import { CheckCircle, AlertCircle, XCircle, Loader2, Image as ImageIcon, ZoomIn, RotateCw } from 'lucide-svelte';
+  import { CheckCircle, AlertCircle, XCircle, Loader2, Image as ImageIcon, ZoomIn, RotateCw, X } from 'lucide-svelte';
   
   let selectedUpload: any = null;
   let selectedUploadDetails: any = null;
@@ -65,6 +65,45 @@
       const details = await apiClient.getUpload(upload.uploadId);
       console.log('📥 Received upload details:', details);
       
+      // Deep log receipts structure
+      if (details.receipts) {
+        console.log('📋 Receipts structure:', {
+          hasAll: !!details.receipts.all,
+          allCount: details.receipts.all?.length || 0,
+          hasSuccessful: !!details.receipts.successful,
+          successfulCount: details.receipts.successful?.length || 0
+        });
+        
+        if (details.receipts.all && details.receipts.all.length > 0) {
+          const firstReceipt = details.receipts.all[0];
+          console.log('🧾 FIRST RECEIPT RAW DATA:', firstReceipt);
+          console.log('💰 Price fields check:', {
+            totalAmount: firstReceipt.totalAmount,
+            totalAmountType: typeof firstReceipt.totalAmount,
+            total: firstReceipt.total,
+            totalType: typeof firstReceipt.total,
+            currency: firstReceipt.currency,
+            currencyType: typeof firstReceipt.currency,
+            allKeys: Object.keys(firstReceipt)
+          });
+          
+          if (firstReceipt.lineItems && firstReceipt.lineItems.length > 0) {
+            const firstItem = firstReceipt.lineItems[0];
+            console.log('📦 FIRST LINE ITEM RAW DATA:', firstItem);
+            console.log('💵 Line item price fields:', {
+              totalPrice: firstItem.totalPrice,
+              totalPriceType: typeof firstItem.totalPrice,
+              amount: firstItem.amount,
+              amountType: typeof firstItem.amount,
+              unit: firstItem.unit,
+              unitType: typeof firstItem.unit,
+              pricePerUnit: firstItem.pricePerUnit,
+              allKeys: Object.keys(firstItem)
+            });
+          }
+        }
+      }
+      
       selectedUploadDetails = details;
       
       // Preload images
@@ -97,23 +136,43 @@
     }
   }
 
-  function formatCurrency(amount: string | number | null | undefined): string {
+  function formatCurrency(amount: string | number | null | undefined, currency: string = 'USD'): string {
     if (amount === null || amount === undefined || amount === '') {
       console.warn('⚠️ formatCurrency received invalid amount:', amount);
-      return '$0.00';
+      return formatZero(currency);
     }
     
     const num = typeof amount === 'string' ? parseFloat(amount) : amount;
     
     if (isNaN(num)) {
-      console.error('❌ formatCurrency: NaN result from amount:', amount);
-      return '$0.00';
+      console.error('❌ formatCurrency: NaN result from amount:', amount, 'currency:', currency);
+      return formatZero(currency);
     }
     
-    return new Intl.NumberFormat('en-US', {
-      style: 'currency',
-      currency: 'USD',
-    }).format(num);
+    try {
+      return new Intl.NumberFormat('en-US', {
+        style: 'currency',
+        currency: currency || 'USD',
+      }).format(num);
+    } catch (err) {
+      console.error('❌ formatCurrency: Invalid currency code:', currency, err);
+      // Fallback to USD if currency code is invalid
+      return new Intl.NumberFormat('en-US', {
+        style: 'currency',
+        currency: 'USD',
+      }).format(num);
+    }
+  }
+
+  function formatZero(currency: string = 'USD'): string {
+    try {
+      return new Intl.NumberFormat('en-US', {
+        style: 'currency',
+        currency: currency || 'USD',
+      }).format(0);
+    } catch (err) {
+      return '$0.00';
+    }
   }
 
   function formatDate(date: Date): string {
@@ -430,13 +489,17 @@
                       storeName: receipt.storeName,
                       totalAmount: receipt.totalAmount,
                       totalAmountType: typeof receipt.totalAmount,
+                      currency: receipt.currency,
+                      currencyType: typeof receipt.currency,
                       taxAmount: receipt.taxAmount,
                       imageUrl: receipt.imageUrl,
                       filename: filename,
                       hasLineItems: !!receipt.lineItems,
                       lineItemsCount: receipt.lineItems?.length || 0,
+                      sampleLineItem: receipt.lineItems?.[0],
                       status: receipt.status,
-                      error: receipt.error
+                      error: receipt.error,
+                      formattedTotal: formatCurrency(receipt.totalAmount, receipt.currency)
                     })}
                   {/if}
                   <div class="rounded-2xl bg-card shadow-sm p-6 hover:shadow-md transition-shadow">
@@ -506,10 +569,10 @@
 
                       {#if receipt.totalAmount}
                         <div class="mb-3">
-                          <p class="text-2xl font-bold">{formatCurrency(receipt.totalAmount)}</p>
+                          <p class="text-2xl font-bold">{formatCurrency(receipt.totalAmount, receipt.currency)}</p>
                           {#if receipt.taxAmount}
                             <p class="text-sm text-muted-foreground">
-                              Tax: {formatCurrency(receipt.taxAmount)}
+                              Tax: {formatCurrency(receipt.taxAmount, receipt.currency)}
                             </p>
                           {/if}
                           {#if receipt.transactionDate}
@@ -525,15 +588,15 @@
                           <p class="text-sm font-medium mb-2">Items ({receipt.lineItems.length})</p>
                           <div class="space-y-1 max-h-40 overflow-y-auto">
                             {#each receipt.lineItems as item}
-                              {@const itemPrice = typeof item.price === 'string' ? parseFloat(item.price) : item.price}
-                              {@const itemQuantity = item.quantity || 1}
-                              {@const itemTotal = !isNaN(itemPrice) ? itemPrice * itemQuantity : 0}
+                              {@const itemTotal = typeof item.totalPrice === 'string' ? parseFloat(item.totalPrice) : (item.totalPrice || 0)}
+                              {@const itemQuantity = typeof item.amount === 'string' ? parseFloat(item.amount) : (item.amount || 1)}
+                              {@const itemUnit = item.unit || item.quantityUnit || ''}
                               <div class="flex justify-between text-sm">
                                 <span class="text-muted-foreground">
                                   {item.description || 'Unknown item'}
-                                  {itemQuantity > 1 ? `(x${itemQuantity})` : ''}
+                                  {itemQuantity > 1 || itemUnit ? ` (${itemQuantity}${itemUnit ? ' ' + itemUnit : ''})` : ''}
                                 </span>
-                                <span class="font-medium">{formatCurrency(itemTotal)}</span>
+                                <span class="font-medium">{formatCurrency(itemTotal, receipt.currency)}</span>
                               </div>
                             {/each}
                           </div>
