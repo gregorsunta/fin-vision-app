@@ -279,6 +279,53 @@ class ApiClient {
       method: 'POST',
     });
   }
+
+  async getUserUploads(options?: {
+    limit?: number;
+    offset?: number;
+    sortBy?: 'createdAt' | 'updatedAt' | 'status';
+    sortOrder?: 'asc' | 'desc';
+    status?: 'processing' | 'completed' | 'partly_completed' | 'failed';
+  }) {
+    const params = new URLSearchParams();
+    if (options?.limit) params.append('limit', options.limit.toString());
+    if (options?.offset) params.append('offset', options.offset.toString());
+    if (options?.sortBy) params.append('sortBy', options.sortBy);
+    if (options?.sortOrder) params.append('sortOrder', options.sortOrder);
+    if (options?.status) params.append('status', options.status);
+
+    const queryString = params.toString();
+    const url = `/users/me/uploads${queryString ? `?${queryString}` : ''}`;
+
+    return this.request<{
+      uploads: Array<{
+        uploadId: number;
+        fileName: string;
+        status: string;
+        hasReceipts: boolean;
+        createdAt: string;
+        updatedAt: string;
+        statistics: {
+          totalDetected: number;
+          successful: number;
+          failed: number;
+          processing: number;
+        };
+        images: {
+          original: string;
+          marked: string | null;
+        };
+      }>;
+      pagination: {
+        total: number;
+        limit: number;
+        offset: number;
+        hasMore: boolean;
+      };
+    }>(url, {
+      method: 'GET',
+    });
+  }
 }
 
 export class ApiError extends Error {

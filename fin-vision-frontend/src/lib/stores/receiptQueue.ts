@@ -1,4 +1,6 @@
 import { writable } from 'svelte/store';
+import { authStore } from './auth';
+import { get } from 'svelte/store';
 
 export interface ReceiptUpload {
   id: string;
@@ -30,6 +32,23 @@ interface ReceiptQueueState {
   uploads: ReceiptUpload[];
   isProcessing: boolean;
   completedUploads: CompletedUpload[];
+  loadingHistory: boolean;
+  historyError: string | null;
+}
+
+// Get user-specific localStorage key
+function getStorageKey(): string {
+  const auth = get(authStore);
+  const userEmail = auth.user?.email;
+  
+  if (!userEmail) {
+    console.warn('⚠️ No user email found, using default storage key');
+    return 'fin-vision-completed-uploads';
+  }
+  
+  // Create user-specific key using email hash for privacy
+  const emailHash = btoa(userEmail).replace(/=/g, '');
+  return `fin-vision-uploads-${emailHash}`;
 }
 
 function createReceiptQueueStore() {
@@ -37,15 +56,20 @@ function createReceiptQueueStore() {
     uploads: [],
     isProcessing: false,
     completedUploads: loadCompletedUploads(),
+    loadingHistory: false,
+    historyError: null,
   });
 
   // Load completed uploads from localStorage
   function loadCompletedUploads(): CompletedUpload[] {
     if (typeof window === 'undefined') return [];
     try {
-      const stored = localStorage.getItem('fin-vision-completed-uploads');
+      const storageKey = getStorageKey();
+      console.log('📂 Loading completed uploads from:', storageKey);
+      const stored = localStorage.getItem(storageKey);
       if (stored) {
         const parsed = JSON.parse(stored);
+        console.log('✅ Loaded', parsed.length, 'completed uploads for current user');
         return parsed.map((u: any) => ({
           ...u,
           uploadedAt: new Date(u.uploadedAt),
@@ -53,7 +77,7 @@ function createReceiptQueueStore() {
         }));
       }
     } catch (err) {
-      console.error('Failed to load completed uploads:', err);
+      console.error('❌ Failed to load completed uploads:', err);
     }
     return [];
   }
@@ -62,9 +86,11 @@ function createReceiptQueueStore() {
   function saveCompletedUploads(uploads: CompletedUpload[]) {
     if (typeof window === 'undefined') return;
     try {
-      localStorage.setItem('fin-vision-completed-uploads', JSON.stringify(uploads));
+      const storageKey = getStorageKey();
+      console.log('💾 Saving', uploads.length, 'completed uploads to:', storageKey);
+      localStorage.setItem(storageKey, JSON.stringify(uploads));
     } catch (err) {
-      console.error('Failed to save completed uploads:', err);
+      console.error('❌ Failed to save completed uploads:', err);
     }
   }
 
@@ -235,6 +261,88 @@ function createReceiptQueueStore() {
         ...state,
         isProcessing,
       }));
+    },
+    
+    // Reload completed uploads for current user (call after login)
+    reloadForUser: () => {
+      console.log('🔄 Reloading completed uploads for current user');
+      const uploads = loadCompletedUploads();
+      update(state => ({
+        ...state,
+        completedUploads: uploads,
+      }));
+    },
+    
+    // Fetch completed uploads from backend API
+    fetchCompletedUploads: async () => {
+      update(state => ({ ...state, loadingHistory: true, historyError: null }));
+      
+      try {
+        console.log('🌐 Fetching upload history from API...');
+        
+        // Dynamic import to avoid circular dependency
+        const { apiClient } = await import('$lib/api/client');
+        
+        const response = await apiClient.getUserUploads({
+          limit: 100, // Get recent uploads
+          sortBy: 'createdAt',
+          sortOrder: 'desc',
+        });
+        
+        console.log('✅ Fetched', response.uploads.length, 'uploads from API');
+        
+        // Transform API response to CompletedUpload format
+        const completedUploads: CompletedUpload[] = response.uploads.map(upload => ({
+          uploadId: upload.uploadId,
+          fileName: upload.fileName,
+          uploadedAt: new Date(upload.createdAt),
+          completedAt: new Date(upload.updatedAt),
+          statistics: upload.statistics,
+          result: {
+            originalImageUrl: upload.images.original,
+            markedImageUrl: upload.images.marked,
+          },
+        }));
+        
+        // Save to localStorage as cache
+        saveCompletedUploads(completedUploads);
+        
+        update(state => ({
+          ...state,
+          completedUploads,
+          loadingHistory: false,
+          historyError: null,
+        }));
+        
+        return completedUploads;
+      } catch (err: any) {
+        console.error('❌ Failed to fetch upload history:', err);
+        
+        // Fall back to localStorage cache
+        console.log('📂 Falling back to localStorage cache');
+        const cachedUploads = loadCompletedUploads();
+        
+        update(state => ({
+          ...state,
+          loadingHistory: false,
+          historyError: err.message || 'Failed to load upload history',
+          completedUploads: cachedUploads,
+        }));
+        
+        return cachedUploads;
+      }
+    },
+    
+    // Clear all data (call on logout)
+    clearAllData: () => {
+      console.log('🧹 Clearing all receipt queue data');
+      set({
+        uploads: [],
+        isProcessing: false,
+        completedUploads: [],
+        loadingHistory: false,
+        historyError: null,
+      });
     },
   };
 }

@@ -1,6 +1,7 @@
 <script lang="ts">
   import { apiClient, ApiError } from '$lib/api/client';
   import { authStore } from '$lib/stores/auth';
+  import { receiptQueue } from '$lib/stores/receiptQueue';
   import Button from './Button.svelte';
   import Input from './Input.svelte';
   import Label from './Label.svelte';
@@ -30,6 +31,9 @@
       // After successful registration, log the user in
       const loginResponse = await apiClient.login(email, password);
       authStore.login(loginResponse.accessToken, email);
+      
+      // Fetch completed uploads from API (will be empty for new user)
+      await receiptQueue.fetchCompletedUploads();
       
       // Dispatch success event
       window.dispatchEvent(new CustomEvent('auth-success'));

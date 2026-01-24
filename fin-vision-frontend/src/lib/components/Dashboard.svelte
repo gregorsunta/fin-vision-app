@@ -24,6 +24,7 @@
       // Ignore logout errors
     } finally {
       authStore.logout();
+      receiptQueue.clearAllData();
     }
   }
 

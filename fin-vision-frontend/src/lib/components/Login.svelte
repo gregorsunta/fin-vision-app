@@ -1,6 +1,7 @@
 <script lang="ts">
   import { apiClient, ApiError } from '$lib/api/client';
   import { authStore } from '$lib/stores/auth';
+  import { receiptQueue } from '$lib/stores/receiptQueue';
   import Button from './Button.svelte';
   import Input from './Input.svelte';
   import Label from './Label.svelte';
@@ -18,6 +19,9 @@
     try {
       const response = await apiClient.login(email, password);
       authStore.login(response.accessToken, email);
+      
+      // Fetch completed uploads from API (with localStorage fallback)
+      await receiptQueue.fetchCompletedUploads();
       
       // Dispatch success event
       window.dispatchEvent(new CustomEvent('auth-success'));

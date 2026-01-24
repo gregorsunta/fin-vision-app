@@ -14,7 +14,31 @@
   let reprocessing = false;
   let showDebug = false;
 
-  async function loadImageUrl(filename: string): Promise<string> {
+  function extractFilename(urlOrFilename: string | null | undefined): string | null {
+    if (!urlOrFilename) {
+      console.warn('⚠️ extractFilename received empty value:', urlOrFilename);
+      return null;
+    }
+    
+    // If it's already just a filename (no slashes), return it
+    if (!urlOrFilename.includes('/')) {
+      return urlOrFilename;
+    }
+    
+    // Extract filename from URL path like "/files/abc123.jpg" or "http://example.com/files/abc123.jpg"
+    const parts = urlOrFilename.split('/');
+    const filename = parts[parts.length - 1];
+    
+    console.log('📝 Extracted filename:', filename, 'from:', urlOrFilename);
+    return filename || null;
+  }
+
+  async function loadImageUrl(filename: string | null): Promise<string> {
+    if (!filename) {
+      console.error('❌ loadImageUrl called with empty filename');
+      return '';
+    }
+    
     if (imageUrls.has(filename)) {
       return imageUrls.get(filename)!;
     }
@@ -46,7 +70,10 @@
       // Preload images
       if (details.images?.marked) {
         console.log('🖼️ Loading marked image:', details.images.marked);
-        loadImageUrl(details.images.marked.split('/').pop());
+        const markedFilename = extractFilename(details.images.marked);
+        if (markedFilename) {
+          loadImageUrl(markedFilename);
+        }
       } else {
         console.warn('⚠️ No marked image found in response');
       }
@@ -54,7 +81,10 @@
       if (details.images?.splitReceipts) {
         console.log('🖼️ Loading', details.images.splitReceipts.length, 'split receipt images');
         details.images.splitReceipts.forEach((url: string) => {
-          loadImageUrl(url.split('/').pop());
+          const filename = extractFilename(url);
+          if (filename) {
+            loadImageUrl(filename);
+          }
         });
       } else {
         console.warn('⚠️ No split receipts found in response');
@@ -67,8 +97,19 @@
     }
   }
 
-  function formatCurrency(amount: string | number): string {
+  function formatCurrency(amount: string | number | null | undefined): string {
+    if (amount === null || amount === undefined || amount === '') {
+      console.warn('⚠️ formatCurrency received invalid amount:', amount);
+      return '$0.00';
+    }
+    
     const num = typeof amount === 'string' ? parseFloat(amount) : amount;
+    
+    if (isNaN(num)) {
+      console.error('❌ formatCurrency: NaN result from amount:', amount);
+      return '$0.00';
+    }
+    
     return new Intl.NumberFormat('en-US', {
       style: 'currency',
       currency: 'USD',
@@ -327,6 +368,7 @@
 
             <!-- Marked Image (Detection Rectangles) -->
             {#if selectedUploadDetails.images.marked}
+              {@const markedFilename = extractFilename(selectedUploadDetails.images.marked)}
               <div class="rounded-2xl bg-card/50 backdrop-blur-sm p-6 shadow-sm">
                 <div class="flex items-center gap-2 mb-4">
                   <div class="p-2 rounded-lg bg-primary/10">
@@ -337,27 +379,41 @@
                     <p class="text-sm text-muted-foreground">Red rectangles show detected receipt boundaries</p>
                   </div>
                 </div>
-                {#await loadImageUrl(selectedUploadDetails.images.marked.split('/').pop())}
-                  <div class="bg-muted/50 rounded-xl h-64 flex items-center justify-center">
-                    <Loader2 class="w-8 h-8 animate-spin text-muted-foreground" />
-                  </div>
-                {:then url}
-                  <button
-                    class="relative group cursor-zoom-in w-full"
-                    on:click={() => selectedImageModal = url}
-                  >
-                    <img
-                      src={url}
-                      alt="Marked receipt"
-                      class="w-full rounded-xl shadow-sm"
-                    />
-                    <div class="absolute inset-0 bg-black/0 group-hover:bg-black/5 transition-colors rounded-xl flex items-center justify-center">
-                      <div class="p-3 rounded-full bg-black/50 opacity-0 group-hover:opacity-100 transition-opacity">
-                        <ZoomIn class="w-6 h-6 text-white" />
-                      </div>
+                {#if markedFilename}
+                  {#await loadImageUrl(markedFilename)}
+                    <div class="bg-muted/50 rounded-xl h-64 flex items-center justify-center">
+                      <Loader2 class="w-8 h-8 animate-spin text-muted-foreground" />
                     </div>
-                  </button>
-                {/await}
+                  {:then url}
+                    {#if url}
+                      <button
+                        class="relative group cursor-zoom-in w-full"
+                        on:click={() => selectedImageModal = url}
+                      >
+                        <img
+                          src={url}
+                          alt="Marked receipt"
+                          class="w-full rounded-xl shadow-sm"
+                        />
+                        <div class="absolute inset-0 bg-black/0 group-hover:bg-black/5 transition-colors rounded-xl flex items-center justify-center">
+                          <div class="p-3 rounded-full bg-black/50 opacity-0 group-hover:opacity-100 transition-opacity">
+                            <ZoomIn class="w-6 h-6 text-white" />
+                          </div>
+                        </div>
+                      </button>
+                    {:else}
+                      <div class="bg-red-50 rounded-xl p-4 text-center text-red-600">
+                        <XCircle class="w-8 h-8 mx-auto mb-2" />
+                        <p class="text-sm">Failed to load marked image</p>
+                      </div>
+                    {/if}
+                  {/await}
+                {:else}
+                  <div class="bg-yellow-50 rounded-xl p-4 text-center text-yellow-600">
+                    <AlertCircle class="w-8 h-8 mx-auto mb-2" />
+                    <p class="text-sm">No marked image filename found</p>
+                  </div>
+                {/if}
               </div>
             {/if}
 
@@ -367,32 +423,67 @@
               <div class="grid gap-4">
                 {#each selectedUploadDetails.receipts.all as receipt, index (receipt.id)}
                   {@const badge = getStatusBadge(receipt)}
+                  {@const filename = extractFilename(receipt.imageUrl)}
+                  {#if showDebug}
+                    <!-- Debug: Log receipt data -->
+                    {console.log(`🧾 Receipt #${receipt.id}:`, {
+                      storeName: receipt.storeName,
+                      totalAmount: receipt.totalAmount,
+                      totalAmountType: typeof receipt.totalAmount,
+                      taxAmount: receipt.taxAmount,
+                      imageUrl: receipt.imageUrl,
+                      filename: filename,
+                      hasLineItems: !!receipt.lineItems,
+                      lineItemsCount: receipt.lineItems?.length || 0,
+                      status: receipt.status,
+                      error: receipt.error
+                    })}
+                  {/if}
                   <div class="rounded-2xl bg-card shadow-sm p-6 hover:shadow-md transition-shadow">
                     <div class="flex items-start gap-6">
                       <!-- Receipt Image -->
-                      {#if receipt.imageUrl}
-                        {@const filename = receipt.imageUrl.split('/').pop()}
+                      {#if receipt.imageUrl && filename}
                         {#await loadImageUrl(filename)}
                           <div class="w-32 h-40 bg-muted/50 rounded-xl flex items-center justify-center flex-shrink-0">
                             <Loader2 class="w-6 h-6 animate-spin text-muted-foreground" />
                           </div>
                         {:then url}
-                          <button
-                            class="relative group cursor-zoom-in flex-shrink-0"
-                            on:click={() => selectedImageModal = url}
-                          >
-                            <img
-                              src={url}
-                              alt="Receipt {index + 1}"
-                              class="w-32 h-40 object-cover rounded-xl shadow-sm"
-                            />
-                            <div class="absolute inset-0 bg-black/0 group-hover:bg-black/10 transition-colors rounded-xl flex items-center justify-center">
-                              <div class="p-2 rounded-full bg-black/50 opacity-0 group-hover:opacity-100 transition-opacity">
-                                <ZoomIn class="w-5 h-5 text-white" />
+                          {#if url}
+                            <button
+                              class="relative group cursor-zoom-in flex-shrink-0"
+                              on:click={() => selectedImageModal = url}
+                            >
+                              <img
+                                src={url}
+                                alt="Receipt {index + 1}"
+                                class="w-32 h-40 object-cover rounded-xl shadow-sm"
+                              />
+                              <div class="absolute inset-0 bg-black/0 group-hover:bg-black/10 transition-colors rounded-xl flex items-center justify-center">
+                                <div class="p-2 rounded-full bg-black/50 opacity-0 group-hover:opacity-100 transition-opacity">
+                                  <ZoomIn class="w-5 h-5 text-white" />
+                                </div>
+                              </div>
+                            </button>
+                          {:else}
+                            <div class="w-32 h-40 bg-red-50 rounded-xl flex items-center justify-center flex-shrink-0">
+                              <div class="text-center">
+                                <XCircle class="w-6 h-6 mx-auto mb-1 text-red-600" />
+                                <p class="text-xs text-red-600">Failed</p>
                               </div>
                             </div>
-                          </button>
+                          {/if}
                         {/await}
+                      {:else if receipt.imageUrl}
+                        <div class="w-32 h-40 bg-yellow-50 rounded-xl flex items-center justify-center flex-shrink-0">
+                          <div class="text-center">
+                            <AlertCircle class="w-6 h-6 mx-auto mb-1 text-yellow-600" />
+                            <p class="text-xs text-yellow-600">No image</p>
+                          </div>
+                        </div>
+                      {:else}
+                        <div class="w-32 h-40 bg-gray-100 rounded-xl flex items-center justify-center flex-shrink-0">
+                          <ImageIcon class="w-8 h-8 text-gray-400" />
+                        </div>
                       {/if}
 
                       <!-- Receipt Data -->
@@ -434,12 +525,15 @@
                           <p class="text-sm font-medium mb-2">Items ({receipt.lineItems.length})</p>
                           <div class="space-y-1 max-h-40 overflow-y-auto">
                             {#each receipt.lineItems as item}
+                              {@const itemPrice = typeof item.price === 'string' ? parseFloat(item.price) : item.price}
+                              {@const itemQuantity = item.quantity || 1}
+                              {@const itemTotal = !isNaN(itemPrice) ? itemPrice * itemQuantity : 0}
                               <div class="flex justify-between text-sm">
                                 <span class="text-muted-foreground">
-                                  {item.description}
-                                  {item.quantity > 1 ? `(x${item.quantity})` : ''}
+                                  {item.description || 'Unknown item'}
+                                  {itemQuantity > 1 ? `(x${itemQuantity})` : ''}
                                 </span>
-                                <span class="font-medium">{formatCurrency(parseFloat(item.price) * item.quantity)}</span>
+                                <span class="font-medium">{formatCurrency(itemTotal)}</span>
                               </div>
                             {/each}
                           </div>
