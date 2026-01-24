@@ -1,0 +1,1088 @@
+{
+	"uploadId": 3,
+	"userId": 1,
+	"status": "processing",
+	"hasReceipts": true,
+	"createdAt": "2026-01-24T20:36:01.000Z",
+	"updatedAt": "2026-01-24T20:36:07.000Z",
+	"images": {
+		"original": "/files/c203819a2b7c2a439cd01c03f03355a7.jpg",
+		"marked": "/files/69ecb5ef2c5e6534c5fff3f1e6dff8da.jpg",
+		"splitReceipts": [
+			"/files/5bdb101794eaf2ca0e893335799fd27a.jpg",
+			"/files/3f4e7104f37f636e2324b0668cb3c791.jpg",
+			"/files/68f3d0e4d36015c9f8ccf2a111ab9085.jpg"
+		]
+	},
+	"statistics": {
+		"totalDetected": 3,
+		"successful": 2,
+		"failed": 0,
+		"processing": 1
+	},
+	"message": "Processing in progress. 1 receipts still being processed.",
+	"receipts": {
+		"successful": [
+			{
+				"id": 9,
+				"uploadId": 3,
+				"storeName": "HOFER TRGOVINA D.O.O.",
+				"totalAmount": "51.5700",
+				"taxAmount": "4.4700",
+				"transactionDate": "2026-01-05T00:00:00.000Z",
+				"currency": "EUR",
+				"status": "processed",
+				"imageUrl": "/files/5bdb101794eaf2ca0e893335799fd27a.jpg",
+				"keywords": [
+					"groceries",
+					"supermarket"
+				],
+				"isDuplicate": false,
+				"duplicateOfReceiptId": null,
+				"duplicateConfidenceScore": null,
+				"lineItems": [
+					{
+						"id": 46,
+						"receiptId": 9,
+						"description": "Pas. paradiz. 500g",
+						"amount": "1.000",
+						"unit": "pieces",
+						"pricePerUnit": null,
+						"totalPrice": "0.5700",
+						"keywords": [
+							"tomato",
+							"vegetable"
+						]
+					},
+					{
+						"id": 47,
+						"receiptId": 9,
+						"description": "Pas. paradiz. 500g",
+						"amount": "1.000",
+						"unit": "pieces",
+						"pricePerUnit": null,
+						"totalPrice": "0.5700",
+						"keywords": [
+							"tomato",
+							"vegetable"
+						]
+					},
+					{
+						"id": 48,
+						"receiptId": 9,
+						"description": "Pas. paradiz. 500g",
+						"amount": "1.000",
+						"unit": "pieces",
+						"pricePerUnit": null,
+						"totalPrice": "0.5700",
+						"keywords": [
+							"tomato",
+							"vegetable"
+						]
+					},
+					{
+						"id": 49,
+						"receiptId": 9,
+						"description": "Pas. paradiz. 500g",
+						"amount": "1.000",
+						"unit": "pieces",
+						"pricePerUnit": null,
+						"totalPrice": "0.5700",
+						"keywords": [
+							"tomato",
+							"vegetable"
+						]
+					},
+					{
+						"id": 50,
+						"receiptId": 9,
+						"description": "Pi.po.klob.IK 400g",
+						"amount": "1.000",
+						"unit": "pieces",
+						"pricePerUnit": null,
+						"totalPrice": "0.8400",
+						"keywords": [
+							"sausage",
+							"meat"
+						]
+					},
+					{
+						"id": 51,
+						"receiptId": 9,
+						"description": "Pi.po.klob.IK 400g",
+						"amount": "1.000",
+						"unit": "pieces",
+						"pricePerUnit": null,
+						"totalPrice": "0.8400",
+						"keywords": [
+							"sausage",
+							"meat"
+						]
+					},
+					{
+						"id": 52,
+						"receiptId": 9,
+						"description": "Pi.po.klob.IK 400g",
+						"amount": "1.000",
+						"unit": "pieces",
+						"pricePerUnit": null,
+						"totalPrice": "0.8400",
+						"keywords": [
+							"sausage",
+							"meat"
+						]
+					},
+					{
+						"id": 53,
+						"receiptId": 9,
+						"description": "Prazeni Mandlji",
+						"amount": "1.000",
+						"unit": "pieces",
+						"pricePerUnit": null,
+						"totalPrice": "2.0200",
+						"keywords": [
+							"nuts",
+							"snack"
+						]
+					},
+					{
+						"id": 54,
+						"receiptId": 9,
+						"description": "Sir gavda 450g",
+						"amount": "1.000",
+						"unit": "pieces",
+						"pricePerUnit": null,
+						"totalPrice": "3.1400",
+						"keywords": [
+							"cheese",
+							"dairy"
+						]
+					},
+					{
+						"id": 55,
+						"receiptId": 9,
+						"description": "Parad. v kosc.400g",
+						"amount": "1.000",
+						"unit": "pieces",
+						"pricePerUnit": null,
+						"totalPrice": "0.6200",
+						"keywords": [
+							"tomato",
+							"vegetable"
+						]
+					},
+					{
+						"id": 56,
+						"receiptId": 9,
+						"description": "Prazeni Mandlji",
+						"amount": "1.000",
+						"unit": "pieces",
+						"pricePerUnit": null,
+						"totalPrice": "2.0200",
+						"keywords": [
+							"nuts",
+							"snack"
+						]
+					},
+					{
+						"id": 57,
+						"receiptId": 9,
+						"description": "Parad. v kosc.400g",
+						"amount": "1.000",
+						"unit": "pieces",
+						"pricePerUnit": null,
+						"totalPrice": "0.6200",
+						"keywords": [
+							"tomato",
+							"vegetable"
+						]
+					},
+					{
+						"id": 58,
+						"receiptId": 9,
+						"description": "Parad. v kosc.400g",
+						"amount": "1.000",
+						"unit": "pieces",
+						"pricePerUnit": null,
+						"totalPrice": "0.6200",
+						"keywords": [
+							"tomato",
+							"vegetable"
+						]
+					},
+					{
+						"id": 59,
+						"receiptId": 9,
+						"description": "Parad. v kosc.400g",
+						"amount": "1.000",
+						"unit": "pieces",
+						"pricePerUnit": null,
+						"totalPrice": "0.6200",
+						"keywords": [
+							"tomato",
+							"vegetable"
+						]
+					},
+					{
+						"id": 60,
+						"receiptId": 9,
+						"description": "Rjavi fizol 400g",
+						"amount": "1.000",
+						"unit": "pieces",
+						"pricePerUnit": null,
+						"totalPrice": "0.4900",
+						"keywords": [
+							"beans",
+							"vegetable"
+						]
+					},
+					{
+						"id": 61,
+						"receiptId": 9,
+						"description": "Rdeci fizol 400g",
+						"amount": "1.000",
+						"unit": "pieces",
+						"pricePerUnit": null,
+						"totalPrice": "0.4900",
+						"keywords": [
+							"beans",
+							"vegetable"
+						]
+					},
+					{
+						"id": 62,
+						"receiptId": 9,
+						"description": "Rdeci fizol 400g",
+						"amount": "1.000",
+						"unit": "pieces",
+						"pricePerUnit": null,
+						"totalPrice": "0.4900",
+						"keywords": [
+							"beans",
+							"vegetable"
+						]
+					},
+					{
+						"id": 63,
+						"receiptId": 9,
+						"description": "Rdeci fizol 400g",
+						"amount": "1.000",
+						"unit": "pieces",
+						"pricePerUnit": null,
+						"totalPrice": "0.4900",
+						"keywords": [
+							"beans",
+							"vegetable"
+						]
+					},
+					{
+						"id": 64,
+						"receiptId": 9,
+						"description": "Rjavi fizol 400g",
+						"amount": "1.000",
+						"unit": "pieces",
+						"pricePerUnit": null,
+						"totalPrice": "0.4500",
+						"keywords": [
+							"beans",
+							"vegetable"
+						]
+					},
+					{
+						"id": 65,
+						"receiptId": 9,
+						"description": "Rjavi fizol 400g",
+						"amount": "1.000",
+						"unit": "pieces",
+						"pricePerUnit": null,
+						"totalPrice": "0.4500",
+						"keywords": [
+							"beans",
+							"vegetable"
+						]
+					},
+					{
+						"id": 66,
+						"receiptId": 9,
+						"description": "Per hrenov. 480g",
+						"amount": "1.000",
+						"unit": "pieces",
+						"pricePerUnit": null,
+						"totalPrice": "2.0400",
+						"keywords": [
+							"sausage",
+							"meat"
+						]
+					},
+					{
+						"id": 67,
+						"receiptId": 9,
+						"description": "Pisc.pos.kl. 800g",
+						"amount": "1.000",
+						"unit": "pieces",
+						"pricePerUnit": null,
+						"totalPrice": "2.1000",
+						"keywords": [
+							"chicken",
+							"meat"
+						]
+					},
+					{
+						"id": 68,
+						"receiptId": 9,
+						"description": "Per hrenov. 480g",
+						"amount": "1.000",
+						"unit": "pieces",
+						"pricePerUnit": null,
+						"totalPrice": "2.0400",
+						"keywords": [
+							"sausage",
+							"meat"
+						]
+					},
+					{
+						"id": 69,
+						"receiptId": 9,
+						"description": "Knorr kocka 120g",
+						"amount": "1.000",
+						"unit": "pieces",
+						"pricePerUnit": null,
+						"totalPrice": "1.4900",
+						"keywords": [
+							"broth",
+							"cooking ingredient"
+						]
+					},
+					{
+						"id": 70,
+						"receiptId": 9,
+						"description": "Knorr kocka 120g",
+						"amount": "1.000",
+						"unit": "pieces",
+						"pricePerUnit": null,
+						"totalPrice": "1.4900",
+						"keywords": [
+							"broth",
+							"cooking ingredient"
+						]
+					},
+					{
+						"id": 71,
+						"receiptId": 9,
+						"description": "Sveze mleko 3.5%1l",
+						"amount": "1.000",
+						"unit": "liters",
+						"pricePerUnit": null,
+						"totalPrice": "0.8800",
+						"keywords": [
+							"milk",
+							"dairy"
+						]
+					},
+					{
+						"id": 72,
+						"receiptId": 9,
+						"description": "Mleta paprika 140g",
+						"amount": "1.000",
+						"unit": "pieces",
+						"pricePerUnit": null,
+						"totalPrice": "1.3400",
+						"keywords": [
+							"spice",
+							"cooking ingredient"
+						]
+					},
+					{
+						"id": 73,
+						"receiptId": 9,
+						"description": "Son margarina 500g",
+						"amount": "1.000",
+						"unit": "pieces",
+						"pricePerUnit": null,
+						"totalPrice": "2.3500",
+						"keywords": [
+							"margarine",
+							"spread"
+						]
+					},
+					{
+						"id": 74,
+						"receiptId": 9,
+						"description": "Vegan. sir. nadom.",
+						"amount": "1.000",
+						"unit": "pieces",
+						"pricePerUnit": null,
+						"totalPrice": "2.3500",
+						"keywords": [
+							"vegan cheese",
+							"dairy substitute"
+						]
+					},
+					{
+						"id": 75,
+						"receiptId": 9,
+						"description": "Vegan. sir. nadom.",
+						"amount": "1.000",
+						"unit": "pieces",
+						"pricePerUnit": null,
+						"totalPrice": "2.3500",
+						"keywords": [
+							"vegan cheese",
+							"dairy substitute"
+						]
+					},
+					{
+						"id": 76,
+						"receiptId": 9,
+						"description": "Domaci prsut",
+						"amount": "0.814",
+						"unit": "kg",
+						"pricePerUnit": null,
+						"totalPrice": "2.0600",
+						"keywords": [
+							"ham",
+							"meat"
+						]
+					},
+					{
+						"id": 77,
+						"receiptId": 9,
+						"description": "Paradiznik",
+						"amount": "1.000",
+						"unit": "kg",
+						"pricePerUnit": null,
+						"totalPrice": "1.5700",
+						"keywords": [
+							"tomato",
+							"vegetable"
+						]
+					},
+					{
+						"id": 78,
+						"receiptId": 9,
+						"description": "Zelje",
+						"amount": "1.688",
+						"unit": "kg",
+						"pricePerUnit": null,
+						"totalPrice": "1.4600",
+						"keywords": [
+							"cabbage",
+							"vegetable"
+						]
+					},
+					{
+						"id": 79,
+						"receiptId": 9,
+						"description": "Sojin jog. 500g",
+						"amount": "1.000",
+						"unit": "pieces",
+						"pricePerUnit": null,
+						"totalPrice": "0.8900",
+						"keywords": [
+							"yogurt",
+							"dairy substitute"
+						]
+					},
+					{
+						"id": 80,
+						"receiptId": 9,
+						"description": "Toast 500g",
+						"amount": "1.000",
+						"unit": "pieces",
+						"pricePerUnit": null,
+						"totalPrice": "0.8900",
+						"keywords": [
+							"bread",
+							"bakery"
+						]
+					}
+				]
+			},
+			{
+				"id": 10,
+				"uploadId": 3,
+				"storeName": "NEWYORKER",
+				"totalAmount": "14.9900",
+				"taxAmount": "2.7000",
+				"transactionDate": "2026-01-07T00:00:00.000Z",
+				"currency": "EUR",
+				"status": "processed",
+				"imageUrl": "/files/3f4e7104f37f636e2324b0668cb3c791.jpg",
+				"keywords": [
+					"clothing",
+					"fashion",
+					"retail"
+				],
+				"isDuplicate": false,
+				"duplicateOfReceiptId": null,
+				"duplicateConfidenceScore": null,
+				"lineItems": [
+					{
+						"id": 81,
+						"receiptId": 10,
+						"description": "fantovske hlave FB Relax Jogge",
+						"amount": "1.000",
+						"unit": "pieces",
+						"pricePerUnit": null,
+						"totalPrice": "14.9900",
+						"keywords": [
+							"clothing",
+							"pants",
+							"joggers",
+							"apparel"
+						]
+					}
+				]
+			}
+		],
+		"failed": [],
+		"processing": [
+			{
+				"id": 11,
+				"uploadId": 3,
+				"storeName": null,
+				"totalAmount": null,
+				"taxAmount": null,
+				"transactionDate": null,
+				"currency": null,
+				"status": "pending",
+				"imageUrl": "/files/68f3d0e4d36015c9f8ccf2a111ab9085.jpg",
+				"keywords": null,
+				"isDuplicate": false,
+				"duplicateOfReceiptId": null,
+				"duplicateConfidenceScore": null,
+				"lineItems": []
+			}
+		],
+		"all": [
+			{
+				"id": 9,
+				"uploadId": 3,
+				"storeName": "HOFER TRGOVINA D.O.O.",
+				"totalAmount": "51.5700",
+				"taxAmount": "4.4700",
+				"transactionDate": "2026-01-05T00:00:00.000Z",
+				"currency": "EUR",
+				"status": "processed",
+				"imageUrl": "/files/5bdb101794eaf2ca0e893335799fd27a.jpg",
+				"keywords": [
+					"groceries",
+					"supermarket"
+				],
+				"isDuplicate": false,
+				"duplicateOfReceiptId": null,
+				"duplicateConfidenceScore": null,
+				"lineItems": [
+					{
+						"id": 46,
+						"receiptId": 9,
+						"description": "Pas. paradiz. 500g",
+						"amount": "1.000",
+						"unit": "pieces",
+						"pricePerUnit": null,
+						"totalPrice": "0.5700",
+						"keywords": [
+							"tomato",
+							"vegetable"
+						]
+					},
+					{
+						"id": 47,
+						"receiptId": 9,
+						"description": "Pas. paradiz. 500g",
+						"amount": "1.000",
+						"unit": "pieces",
+						"pricePerUnit": null,
+						"totalPrice": "0.5700",
+						"keywords": [
+							"tomato",
+							"vegetable"
+						]
+					},
+					{
+						"id": 48,
+						"receiptId": 9,
+						"description": "Pas. paradiz. 500g",
+						"amount": "1.000",
+						"unit": "pieces",
+						"pricePerUnit": null,
+						"totalPrice": "0.5700",
+						"keywords": [
+							"tomato",
+							"vegetable"
+						]
+					},
+					{
+						"id": 49,
+						"receiptId": 9,
+						"description": "Pas. paradiz. 500g",
+						"amount": "1.000",
+						"unit": "pieces",
+						"pricePerUnit": null,
+						"totalPrice": "0.5700",
+						"keywords": [
+							"tomato",
+							"vegetable"
+						]
+					},
+					{
+						"id": 50,
+						"receiptId": 9,
+						"description": "Pi.po.klob.IK 400g",
+						"amount": "1.000",
+						"unit": "pieces",
+						"pricePerUnit": null,
+						"totalPrice": "0.8400",
+						"keywords": [
+							"sausage",
+							"meat"
+						]
+					},
+					{
+						"id": 51,
+						"receiptId": 9,
+						"description": "Pi.po.klob.IK 400g",
+						"amount": "1.000",
+						"unit": "pieces",
+						"pricePerUnit": null,
+						"totalPrice": "0.8400",
+						"keywords": [
+							"sausage",
+							"meat"
+						]
+					},
+					{
+						"id": 52,
+						"receiptId": 9,
+						"description": "Pi.po.klob.IK 400g",
+						"amount": "1.000",
+						"unit": "pieces",
+						"pricePerUnit": null,
+						"totalPrice": "0.8400",
+						"keywords": [
+							"sausage",
+							"meat"
+						]
+					},
+					{
+						"id": 53,
+						"receiptId": 9,
+						"description": "Prazeni Mandlji",
+						"amount": "1.000",
+						"unit": "pieces",
+						"pricePerUnit": null,
+						"totalPrice": "2.0200",
+						"keywords": [
+							"nuts",
+							"snack"
+						]
+					},
+					{
+						"id": 54,
+						"receiptId": 9,
+						"description": "Sir gavda 450g",
+						"amount": "1.000",
+						"unit": "pieces",
+						"pricePerUnit": null,
+						"totalPrice": "3.1400",
+						"keywords": [
+							"cheese",
+							"dairy"
+						]
+					},
+					{
+						"id": 55,
+						"receiptId": 9,
+						"description": "Parad. v kosc.400g",
+						"amount": "1.000",
+						"unit": "pieces",
+						"pricePerUnit": null,
+						"totalPrice": "0.6200",
+						"keywords": [
+							"tomato",
+							"vegetable"
+						]
+					},
+					{
+						"id": 56,
+						"receiptId": 9,
+						"description": "Prazeni Mandlji",
+						"amount": "1.000",
+						"unit": "pieces",
+						"pricePerUnit": null,
+						"totalPrice": "2.0200",
+						"keywords": [
+							"nuts",
+							"snack"
+						]
+					},
+					{
+						"id": 57,
+						"receiptId": 9,
+						"description": "Parad. v kosc.400g",
+						"amount": "1.000",
+						"unit": "pieces",
+						"pricePerUnit": null,
+						"totalPrice": "0.6200",
+						"keywords": [
+							"tomato",
+							"vegetable"
+						]
+					},
+					{
+						"id": 58,
+						"receiptId": 9,
+						"description": "Parad. v kosc.400g",
+						"amount": "1.000",
+						"unit": "pieces",
+						"pricePerUnit": null,
+						"totalPrice": "0.6200",
+						"keywords": [
+							"tomato",
+							"vegetable"
+						]
+					},
+					{
+						"id": 59,
+						"receiptId": 9,
+						"description": "Parad. v kosc.400g",
+						"amount": "1.000",
+						"unit": "pieces",
+						"pricePerUnit": null,
+						"totalPrice": "0.6200",
+						"keywords": [
+							"tomato",
+							"vegetable"
+						]
+					},
+					{
+						"id": 60,
+						"receiptId": 9,
+						"description": "Rjavi fizol 400g",
+						"amount": "1.000",
+						"unit": "pieces",
+						"pricePerUnit": null,
+						"totalPrice": "0.4900",
+						"keywords": [
+							"beans",
+							"vegetable"
+						]
+					},
+					{
+						"id": 61,
+						"receiptId": 9,
+						"description": "Rdeci fizol 400g",
+						"amount": "1.000",
+						"unit": "pieces",
+						"pricePerUnit": null,
+						"totalPrice": "0.4900",
+						"keywords": [
+							"beans",
+							"vegetable"
+						]
+					},
+					{
+						"id": 62,
+						"receiptId": 9,
+						"description": "Rdeci fizol 400g",
+						"amount": "1.000",
+						"unit": "pieces",
+						"pricePerUnit": null,
+						"totalPrice": "0.4900",
+						"keywords": [
+							"beans",
+							"vegetable"
+						]
+					},
+					{
+						"id": 63,
+						"receiptId": 9,
+						"description": "Rdeci fizol 400g",
+						"amount": "1.000",
+						"unit": "pieces",
+						"pricePerUnit": null,
+						"totalPrice": "0.4900",
+						"keywords": [
+							"beans",
+							"vegetable"
+						]
+					},
+					{
+						"id": 64,
+						"receiptId": 9,
+						"description": "Rjavi fizol 400g",
+						"amount": "1.000",
+						"unit": "pieces",
+						"pricePerUnit": null,
+						"totalPrice": "0.4500",
+						"keywords": [
+							"beans",
+							"vegetable"
+						]
+					},
+					{
+						"id": 65,
+						"receiptId": 9,
+						"description": "Rjavi fizol 400g",
+						"amount": "1.000",
+						"unit": "pieces",
+						"pricePerUnit": null,
+						"totalPrice": "0.4500",
+						"keywords": [
+							"beans",
+							"vegetable"
+						]
+					},
+					{
+						"id": 66,
+						"receiptId": 9,
+						"description": "Per hrenov. 480g",
+						"amount": "1.000",
+						"unit": "pieces",
+						"pricePerUnit": null,
+						"totalPrice": "2.0400",
+						"keywords": [
+							"sausage",
+							"meat"
+						]
+					},
+					{
+						"id": 67,
+						"receiptId": 9,
+						"description": "Pisc.pos.kl. 800g",
+						"amount": "1.000",
+						"unit": "pieces",
+						"pricePerUnit": null,
+						"totalPrice": "2.1000",
+						"keywords": [
+							"chicken",
+							"meat"
+						]
+					},
+					{
+						"id": 68,
+						"receiptId": 9,
+						"description": "Per hrenov. 480g",
+						"amount": "1.000",
+						"unit": "pieces",
+						"pricePerUnit": null,
+						"totalPrice": "2.0400",
+						"keywords": [
+							"sausage",
+							"meat"
+						]
+					},
+					{
+						"id": 69,
+						"receiptId": 9,
+						"description": "Knorr kocka 120g",
+						"amount": "1.000",
+						"unit": "pieces",
+						"pricePerUnit": null,
+						"totalPrice": "1.4900",
+						"keywords": [
+							"broth",
+							"cooking ingredient"
+						]
+					},
+					{
+						"id": 70,
+						"receiptId": 9,
+						"description": "Knorr kocka 120g",
+						"amount": "1.000",
+						"unit": "pieces",
+						"pricePerUnit": null,
+						"totalPrice": "1.4900",
+						"keywords": [
+							"broth",
+							"cooking ingredient"
+						]
+					},
+					{
+						"id": 71,
+						"receiptId": 9,
+						"description": "Sveze mleko 3.5%1l",
+						"amount": "1.000",
+						"unit": "liters",
+						"pricePerUnit": null,
+						"totalPrice": "0.8800",
+						"keywords": [
+							"milk",
+							"dairy"
+						]
+					},
+					{
+						"id": 72,
+						"receiptId": 9,
+						"description": "Mleta paprika 140g",
+						"amount": "1.000",
+						"unit": "pieces",
+						"pricePerUnit": null,
+						"totalPrice": "1.3400",
+						"keywords": [
+							"spice",
+							"cooking ingredient"
+						]
+					},
+					{
+						"id": 73,
+						"receiptId": 9,
+						"description": "Son margarina 500g",
+						"amount": "1.000",
+						"unit": "pieces",
+						"pricePerUnit": null,
+						"totalPrice": "2.3500",
+						"keywords": [
+							"margarine",
+							"spread"
+						]
+					},
+					{
+						"id": 74,
+						"receiptId": 9,
+						"description": "Vegan. sir. nadom.",
+						"amount": "1.000",
+						"unit": "pieces",
+						"pricePerUnit": null,
+						"totalPrice": "2.3500",
+						"keywords": [
+							"vegan cheese",
+							"dairy substitute"
+						]
+					},
+					{
+						"id": 75,
+						"receiptId": 9,
+						"description": "Vegan. sir. nadom.",
+						"amount": "1.000",
+						"unit": "pieces",
+						"pricePerUnit": null,
+						"totalPrice": "2.3500",
+						"keywords": [
+							"vegan cheese",
+							"dairy substitute"
+						]
+					},
+					{
+						"id": 76,
+						"receiptId": 9,
+						"description": "Domaci prsut",
+						"amount": "0.814",
+						"unit": "kg",
+						"pricePerUnit": null,
+						"totalPrice": "2.0600",
+						"keywords": [
+							"ham",
+							"meat"
+						]
+					},
+					{
+						"id": 77,
+						"receiptId": 9,
+						"description": "Paradiznik",
+						"amount": "1.000",
+						"unit": "kg",
+						"pricePerUnit": null,
+						"totalPrice": "1.5700",
+						"keywords": [
+							"tomato",
+							"vegetable"
+						]
+					},
+					{
+						"id": 78,
+						"receiptId": 9,
+						"description": "Zelje",
+						"amount": "1.688",
+						"unit": "kg",
+						"pricePerUnit": null,
+						"totalPrice": "1.4600",
+						"keywords": [
+							"cabbage",
+							"vegetable"
+						]
+					},
+					{
+						"id": 79,
+						"receiptId": 9,
+						"description": "Sojin jog. 500g",
+						"amount": "1.000",
+						"unit": "pieces",
+						"pricePerUnit": null,
+						"totalPrice": "0.8900",
+						"keywords": [
+							"yogurt",
+							"dairy substitute"
+						]
+					},
+					{
+						"id": 80,
+						"receiptId": 9,
+						"description": "Toast 500g",
+						"amount": "1.000",
+						"unit": "pieces",
+						"pricePerUnit": null,
+						"totalPrice": "0.8900",
+						"keywords": [
+							"bread",
+							"bakery"
+						]
+					}
+				]
+			},
+			{
+				"id": 10,
+				"uploadId": 3,
+				"storeName": "NEWYORKER",
+				"totalAmount": "14.9900",
+				"taxAmount": "2.7000",
+				"transactionDate": "2026-01-07T00:00:00.000Z",
+				"currency": "EUR",
+				"status": "processed",
+				"imageUrl": "/files/3f4e7104f37f636e2324b0668cb3c791.jpg",
+				"keywords": [
+					"clothing",
+					"fashion",
+					"retail"
+				],
+				"isDuplicate": false,
+				"duplicateOfReceiptId": null,
+				"duplicateConfidenceScore": null,
+				"lineItems": [
+					{
+						"id": 81,
+						"receiptId": 10,
+						"description": "fantovske hlave FB Relax Jogge",
+						"amount": "1.000",
+						"unit": "pieces",
+						"pricePerUnit": null,
+						"totalPrice": "14.9900",
+						"keywords": [
+							"clothing",
+							"pants",
+							"joggers",
+							"apparel"
+						]
+					}
+				]
+			},
+			{
+				"id": 11,
+				"uploadId": 3,
+				"storeName": null,
+				"totalAmount": null,
+				"taxAmount": null,
+				"transactionDate": null,
+				"currency": null,
+				"status": "pending",
+				"imageUrl": "/files/68f3d0e4d36015c9f8ccf2a111ab9085.jpg",
+				"keywords": null,
+				"isDuplicate": false,
+				"duplicateOfReceiptId": null,
+				"duplicateConfidenceScore": null,
+				"lineItems": []
+			}
+		]
+	},
+	"errors": []
+}
