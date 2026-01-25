@@ -590,11 +590,14 @@
                             {#each receipt.lineItems as item}
                               {@const itemTotal = typeof item.totalPrice === 'string' ? parseFloat(item.totalPrice) : (item.totalPrice || 0)}
                               {@const itemQuantity = typeof item.amount === 'string' ? parseFloat(item.amount) : (item.amount || 1)}
-                              {@const itemUnit = item.unit || item.quantityUnit || ''}
+                              {@const itemUnit = item.unit || ''}
+                              {@const shouldShowQuantity = itemQuantity > 1 && itemUnit !== 'g' && itemUnit !== 'ml'}
                               <div class="flex justify-between text-sm">
                                 <span class="text-muted-foreground">
                                   {item.description || 'Unknown item'}
-                                  {itemQuantity > 1 || itemUnit ? ` (${itemQuantity}${itemUnit ? ' ' + itemUnit : ''})` : ''}
+                                  {#if shouldShowQuantity}
+                                    <span class="text-xs ml-1">(×{itemQuantity}{itemUnit ? ' ' + itemUnit : ''})</span>
+                                  {/if}
                                 </span>
                                 <span class="font-medium">{formatCurrency(itemTotal, receipt.currency)}</span>
                               </div>
