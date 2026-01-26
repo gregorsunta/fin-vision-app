@@ -3,7 +3,7 @@
   import { authStore } from '$lib/stores/auth';
   import { apiClient } from '$lib/api/client';
   import Button from './Button.svelte';
-  import { Upload, FileText, Download, LogOut } from 'lucide-svelte';
+  import { Upload, FileText, Download, LogOut, Settings } from 'lucide-svelte';
 
   async function handleLogout() {
     try {
@@ -73,7 +73,20 @@
           <span class="font-medium">Export</span>
         </a>
 
-        <div class="ml-2 pl-2">
+        <div class="ml-2 pl-2 border-l">
+          <a
+            href="/settings"
+            use:link
+            class="flex items-center gap-2 px-3 py-2 rounded-xl transition-all text-muted-foreground hover:text-foreground hover:bg-muted/50 {isActive('/settings')
+              ? '!bg-muted !text-foreground'
+              : ''}"
+            title="Settings"
+          >
+            <Settings class="w-5 h-5" />
+          </a>
+        </div>
+
+        <div class="pl-2">
           <Button variant="ghost" size="sm" on:click={handleLogout} class="rounded-xl">
             <LogOut class="w-4 h-4 mr-2" />
             Logout

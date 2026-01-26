@@ -8,6 +8,7 @@
   import UploadPage from './lib/pages/UploadPage.svelte';
   import ReceiptsPage from './lib/pages/ReceiptsPage.svelte';
   import ExportPage from './lib/pages/ExportPage.svelte';
+  import SettingsPage from './lib/pages/SettingsPage.svelte';
   import './lib/services/queueProcessor'; // Initialize queue processor
 
   let showRegister = false;
@@ -16,6 +17,7 @@
     '/': UploadPage,
     '/receipts': ReceiptsPage,
     '/export': ExportPage,
+    '/settings': SettingsPage,
   };
 
   onMount(() => {

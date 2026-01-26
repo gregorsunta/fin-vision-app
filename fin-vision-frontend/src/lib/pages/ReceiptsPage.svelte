@@ -4,7 +4,7 @@
   import { apiClient } from '$lib/api/client';
   import Card from '$lib/components/Card.svelte';
   import Button from '$lib/components/Button.svelte';
-  import { CheckCircle, AlertCircle, XCircle, Loader2, Image as ImageIcon, ZoomIn, RotateCw, X } from 'lucide-svelte';
+  import { CheckCircle, AlertCircle, XCircle, Loader2, Image as ImageIcon, ZoomIn, RotateCw, X, AlertTriangle } from 'lucide-svelte';
   
   let selectedUpload: any = null;
   let selectedUploadDetails: any = null;
@@ -185,16 +185,39 @@
     }).format(date);
   }
 
-  function getStatusBadge(receipt: any) {
+  function getStatusBadge(receipt: any, hasWarnings: boolean = false) {
     if (receipt.status === 'success' || receipt.storeName) {
-      return { text: 'Success', color: 'bg-green-100 text-green-800' };
+      if (hasWarnings) {
+        return { text: 'Needs Review', color: 'bg-orange-100 text-orange-800', icon: AlertTriangle };
+      }
+      return { text: 'Success', color: 'bg-green-100 text-green-800', icon: CheckCircle };
     } else if (receipt.status === 'processing') {
-      return { text: 'Processing', color: 'bg-blue-100 text-blue-800' };
+      return { text: 'Processing', color: 'bg-blue-100 text-blue-800', icon: Loader2 };
     } else if (receipt.error) {
-      return { text: 'Possible Issues', color: 'bg-yellow-100 text-yellow-800' };
+      return { text: 'Possible Issues', color: 'bg-yellow-100 text-yellow-800', icon: AlertCircle };
     } else {
-      return { text: 'Failed', color: 'bg-red-100 text-red-800' };
+      return { text: 'Failed', color: 'bg-red-100 text-red-800', icon: XCircle };
     }
+  }
+
+  function getValidationWarningsForReceipt(receiptId: number): any[] {
+    if (!selectedUploadDetails?.errors) return [];
+    
+    return selectedUploadDetails.errors.filter((error: any) => 
+      error.receiptId === receiptId && 
+      error.category === 'VALIDATION_WARNING'
+    );
+  }
+
+  function formatPriceMismatchWarning(warning: any): string {
+    const metadata = warning.metadata || {};
+    const details = metadata.details || {};
+    
+    if (details.calculatedSubtotal && details.receiptSubtotal && details.difference) {
+      return `Sum of item prices (${formatCurrency(details.calculatedSubtotal, 'EUR')}) differs from receipt total by ${formatCurrency(Math.abs(parseFloat(details.difference)), 'EUR')}`;
+    }
+    
+    return warning.message || 'Price validation warning';
   }
 
   async function retryProcessing(uploadId: number) {
@@ -476,12 +499,69 @@
               </div>
             {/if}
 
+            <!-- Split Receipt Images -->
+            {#if selectedUploadDetails.images.splitReceipts && selectedUploadDetails.images.splitReceipts.length > 0}
+              <div class="rounded-2xl bg-card/50 backdrop-blur-sm p-6 shadow-sm">
+                <div class="flex items-center gap-2 mb-4">
+                  <div class="p-2 rounded-lg bg-primary/10">
+                    <ImageIcon class="w-5 h-5 text-primary" />
+                  </div>
+                  <div>
+                    <h3 class="font-semibold">Split Receipt Images</h3>
+                    <p class="text-sm text-muted-foreground">Individual receipt images extracted from the upload</p>
+                  </div>
+                </div>
+                <div class="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
+                  {#each selectedUploadDetails.images.splitReceipts as splitReceiptUrl, index}
+                    {@const filename = extractFilename(splitReceiptUrl)}
+                    {#if filename}
+                      {#await loadImageUrl(filename)}
+                        <div class="bg-muted/50 rounded-xl h-48 flex items-center justify-center">
+                          <Loader2 class="w-6 h-6 animate-spin text-muted-foreground" />
+                        </div>
+                      {:then url}
+                        {#if url}
+                          <button
+                            class="relative group cursor-zoom-in"
+                            on:click={() => selectedImageModal = url}
+                          >
+                            <img
+                              src={url}
+                              alt="Split receipt {index + 1}"
+                              class="w-full h-48 object-cover rounded-xl shadow-sm"
+                            />
+                            <div class="absolute inset-0 bg-black/0 group-hover:bg-black/10 transition-colors rounded-xl flex items-center justify-center">
+                              <div class="p-2 rounded-full bg-black/50 opacity-0 group-hover:opacity-100 transition-opacity">
+                                <ZoomIn class="w-5 h-5 text-white" />
+                              </div>
+                            </div>
+                            <div class="absolute bottom-2 left-2 px-2 py-1 bg-black/70 text-white text-xs rounded-md">
+                              Receipt {index + 1}
+                            </div>
+                          </button>
+                        {:else}
+                          <div class="bg-red-50 rounded-xl h-48 flex items-center justify-center">
+                            <div class="text-center">
+                              <XCircle class="w-6 h-6 mx-auto mb-1 text-red-600" />
+                              <p class="text-xs text-red-600">Failed to load</p>
+                            </div>
+                          </div>
+                        {/if}
+                      {/await}
+                    {/if}
+                  {/each}
+                </div>
+              </div>
+            {/if}
+
             <!-- Individual Receipts -->
             <div>
               <h2 class="text-2xl font-bold mb-4">Individual Receipts</h2>
               <div class="grid gap-4">
                 {#each selectedUploadDetails.receipts.all as receipt, index (receipt.id)}
-                  {@const badge = getStatusBadge(receipt)}
+                  {@const warnings = getValidationWarningsForReceipt(receipt.id)}
+                  {@const hasWarnings = warnings.length > 0}
+                  {@const badge = getStatusBadge(receipt, hasWarnings)}
                   {@const filename = extractFilename(receipt.imageUrl)}
                   {#if showDebug}
                     <!-- Debug: Log receipt data -->
@@ -605,6 +685,49 @@
                           </div>
                         </div>
                       {/if}
+
+                        {#if hasWarnings}
+                          <div class="mt-3 space-y-2">
+                            {#each warnings as warning}
+                              <div class="px-3 py-2 bg-orange-50 border border-orange-200 rounded-lg text-sm">
+                                <div class="flex items-start gap-2">
+                                  <AlertTriangle class="w-4 h-4 flex-shrink-0 mt-0.5 text-orange-600" />
+                                  <div class="flex-1">
+                                    <p class="font-medium text-orange-900">Validation Warning</p>
+                                    <p class="text-orange-800 mt-1">{formatPriceMismatchWarning(warning)}</p>
+                                    {#if warning.metadata?.details?.items}
+                                      <details class="mt-2">
+                                        <summary class="cursor-pointer text-xs text-orange-700 hover:text-orange-900">
+                                          View item breakdown
+                                        </summary>
+                                        <div class="mt-2 space-y-1 text-xs bg-white/50 p-2 rounded">
+                                          {#each warning.metadata.details.items as item}
+                                            <div class="flex justify-between">
+                                              <span>{item.description}</span>
+                                              <span class="font-medium">{formatCurrency(item.price, receipt.currency)}</span>
+                                            </div>
+                                          {/each}
+                                          <div class="border-t border-orange-200 pt-1 mt-1 flex justify-between font-medium">
+                                            <span>Calculated:</span>
+                                            <span>{formatCurrency(warning.metadata.details.calculatedSubtotal, receipt.currency)}</span>
+                                          </div>
+                                          <div class="flex justify-between font-medium">
+                                            <span>Receipt total:</span>
+                                            <span>{formatCurrency(warning.metadata.details.receiptSubtotal, receipt.currency)}</span>
+                                          </div>
+                                          <div class="flex justify-between font-bold text-orange-900">
+                                            <span>Difference:</span>
+                                            <span>{formatCurrency(Math.abs(parseFloat(warning.metadata.details.difference)), receipt.currency)}</span>
+                                          </div>
+                                        </div>
+                                      </details>
+                                    {/if}
+                                  </div>
+                                </div>
+                              </div>
+                            {/each}
+                          </div>
+                        {/if}
 
                         {#if receipt.error}
                           <div class="mt-3 px-3 py-2 bg-yellow-50 rounded-lg text-sm text-yellow-800 flex items-start gap-2">
