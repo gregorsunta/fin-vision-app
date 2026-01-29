@@ -146,7 +146,8 @@ class ApiClient {
           items: Array<{
             description: string;
             quantity: number;
-            price: number;
+            unitPrice: number;
+            lineTotal: number;
             keywords: string[];
           }>;
         };
@@ -239,8 +240,10 @@ class ApiClient {
       lineItems: Array<{
         id: number;
         description: string;
-        quantity: number;
-        price: string;
+        amount: string;
+        unit: string;
+        pricePerUnit: string;
+        totalPrice: string;
         keywords?: string[];
       }>;
       error?: string;
@@ -276,6 +279,17 @@ class ApiClient {
       message: string;
       statusUrl: string;
     }>(`/receipts/${uploadId}/reprocess`, {
+      method: 'POST',
+    });
+  }
+
+  async reprocessSingleReceipt(uploadId: number, receiptId: number) {
+    return this.request<{
+      uploadId: number;
+      receiptId: number;
+      message: string;
+      statusUrl: string;
+    }>(`/receipts/${uploadId}/receipt/${receiptId}/reprocess`, {
       method: 'POST',
     });
   }

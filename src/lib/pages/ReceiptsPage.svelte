@@ -1,5 +1,5 @@
 <script lang="ts">
-  import { onMount } from 'svelte';
+  import { onMount, onDestroy } from 'svelte';
   import { receiptQueue } from '$lib/stores/receiptQueue';
   import { apiClient } from '$lib/api/client';
   import Card from '$lib/components/Card.svelte';
@@ -12,7 +12,9 @@
   let imageUrls: Map<string, string> = new Map();
   let selectedImageModal: string | null = null;
   let reprocessing = false;
+  let reprocessingReceipts = new Set<number>();
   let showDebug = false;
+  let pollingInterval: ReturnType<typeof setInterval> | null = null;
 
   function extractFilename(urlOrFilename: string | null | undefined): string | null {
     if (!urlOrFilename) {
@@ -128,6 +130,7 @@
       } else {
         console.warn('⚠️ No split receipts found in response');
       }
+      startPollingIfProcessing();
     } catch (err) {
       console.error('❌ Failed to load upload details:', err);
       alert(`Failed to load upload details: ${err instanceof Error ? err.message : 'Unknown error'}`);
@@ -186,17 +189,19 @@
   }
 
   function getStatusBadge(receipt: any, hasWarnings: boolean = false) {
-    if (receipt.status === 'success' || receipt.storeName) {
+    if (receipt.status === 'pending') {
+      return { text: 'Processing', color: 'bg-blue-100 text-blue-800', icon: Loader2 };
+    } else if (receipt.status === 'processed' || receipt.storeName) {
       if (hasWarnings) {
         return { text: 'Needs Review', color: 'bg-orange-100 text-orange-800', icon: AlertTriangle };
       }
       return { text: 'Success', color: 'bg-green-100 text-green-800', icon: CheckCircle };
-    } else if (receipt.status === 'processing') {
-      return { text: 'Processing', color: 'bg-blue-100 text-blue-800', icon: Loader2 };
-    } else if (receipt.error) {
-      return { text: 'Possible Issues', color: 'bg-yellow-100 text-yellow-800', icon: AlertCircle };
-    } else {
+    } else if (receipt.status === 'unreadable') {
+      return { text: 'Unreadable', color: 'bg-yellow-100 text-yellow-800', icon: AlertCircle };
+    } else if (receipt.status === 'failed') {
       return { text: 'Failed', color: 'bg-red-100 text-red-800', icon: XCircle };
+    } else {
+      return { text: 'Unknown', color: 'bg-gray-100 text-gray-800', icon: AlertCircle };
     }
   }
 
@@ -222,31 +227,100 @@
 
   async function retryProcessing(uploadId: number) {
     if (reprocessing) return;
-    
+
     reprocessing = true;
     try {
-      await apiClient.reprocessReceipt(uploadId);
-      
-      // Wait a moment and then reload the details
-      await new Promise(resolve => setTimeout(resolve, 1000));
-      
-      // Reload the upload details to show new status
+      const result = await apiClient.reprocessReceipt(uploadId);
+      console.log('Reprocess result:', result);
+
+      await new Promise(resolve => setTimeout(resolve, 1500));
+
       if (selectedUpload && selectedUpload.uploadId === uploadId) {
         await selectUpload(selectedUpload);
       }
-      
-      alert('Reprocessing started. Please check back in a few moments.');
     } catch (err: any) {
-      console.error('Failed to reprocess receipt:', err);
+      console.error('Failed to reprocess:', err);
       alert(err.message || 'Failed to start reprocessing');
     } finally {
       reprocessing = false;
     }
   }
 
+  async function retrySingleReceipt(uploadId: number, receiptId: number) {
+    if (reprocessingReceipts.has(receiptId)) return;
+
+    reprocessingReceipts.add(receiptId);
+    reprocessingReceipts = reprocessingReceipts;
+
+    try {
+      const result = await apiClient.reprocessSingleReceipt(uploadId, receiptId);
+      console.log('Single receipt reprocess result:', result);
+
+      await new Promise(resolve => setTimeout(resolve, 2000));
+
+      if (selectedUpload && selectedUpload.uploadId === uploadId) {
+        await selectUpload(selectedUpload);
+      }
+    } catch (err: any) {
+      console.error('Failed to reprocess receipt:', err);
+      alert(err.message || 'Failed to start reprocessing');
+    } finally {
+      reprocessingReceipts.delete(receiptId);
+      reprocessingReceipts = reprocessingReceipts;
+    }
+  }
+
+  function startPollingIfProcessing() {
+    stopPolling();
+    if (selectedUploadDetails?.status === 'processing') {
+      // Don't poll if the upload looks stuck (>5 min old with no receipts)
+      const updatedAt = new Date(selectedUploadDetails.updatedAt);
+      const isStuck = (Date.now() - updatedAt.getTime()) > 5 * 60 * 1000
+        && selectedUploadDetails.statistics.totalDetected === 0;
+      if (isStuck) return;
+
+      pollingInterval = setInterval(async () => {
+        if (selectedUpload) {
+          try {
+            const details = await apiClient.getUpload(selectedUpload.uploadId);
+            selectedUploadDetails = details;
+
+            if (details.images?.marked) {
+              const markedFilename = extractFilename(details.images.marked);
+              if (markedFilename) loadImageUrl(markedFilename);
+            }
+            if (details.images?.splitReceipts) {
+              details.images.splitReceipts.forEach((url: string) => {
+                const filename = extractFilename(url);
+                if (filename) loadImageUrl(filename);
+              });
+            }
+
+            if (details.status !== 'processing') {
+              stopPolling();
+            }
+          } catch (err) {
+            console.error('Polling error:', err);
+          }
+        }
+      }, 3000);
+    }
+  }
+
+  function stopPolling() {
+    if (pollingInterval) {
+      clearInterval(pollingInterval);
+      pollingInterval = null;
+    }
+  }
+
   function closeModal() {
     selectedImageModal = null;
   }
+
+  onDestroy(() => {
+    stopPolling();
+  });
 
   $: sortedUploads = [...$receiptQueue.completedUploads].sort(
     (a, b) => b.completedAt.getTime() - a.completedAt.getTime()
@@ -306,6 +380,9 @@
                   <div class="text-right">
                     <p class="text-sm font-semibold">{upload.statistics.totalDetected}</p>
                     <p class="text-xs text-muted-foreground">receipt{upload.statistics.totalDetected !== 1 ? 's' : ''}</p>
+                    {#if upload.statistics.processing > 0}
+                      <Loader2 class="w-3 h-3 inline animate-spin text-blue-500 mt-0.5" />
+                    {/if}
                   </div>
                 </div>
                 
@@ -389,29 +466,91 @@
               </div>
             {/if}
             
+            <!-- Processing Status Banner -->
+            {#if selectedUploadDetails.status === 'processing'}
+              {@const updatedAt = new Date(selectedUploadDetails.updatedAt)}
+              {@const isStuck = (Date.now() - updatedAt.getTime()) > 5 * 60 * 1000 && selectedUploadDetails.statistics.totalDetected === 0}
+              {#if isStuck}
+                <div class="rounded-2xl bg-yellow-50 border-2 border-yellow-200 p-5 shadow-sm">
+                  <div class="flex items-center gap-3">
+                    <AlertTriangle class="w-6 h-6 text-yellow-600 flex-shrink-0" />
+                    <div class="flex-1">
+                      <h3 class="font-semibold text-yellow-900">Processing appears stuck</h3>
+                      <p class="text-sm text-yellow-700 mt-1">This upload has been processing since {updatedAt.toLocaleString()} with no results. The background job may have failed. Try "Redo All" to reprocess.</p>
+                    </div>
+                  </div>
+                </div>
+              {:else}
+                <div class="rounded-2xl bg-blue-50 border-2 border-blue-200 p-5 shadow-sm">
+                  <div class="flex items-center gap-3">
+                    <Loader2 class="w-6 h-6 animate-spin text-blue-600 flex-shrink-0" />
+                    <div class="flex-1">
+                      <h3 class="font-semibold text-blue-900">Processing in progress</h3>
+                      <p class="text-sm text-blue-700 mt-1">{selectedUploadDetails.message}</p>
+                      {#if selectedUploadDetails.statistics.totalDetected > 0}
+                        <div class="mt-3 w-full bg-blue-200 rounded-full h-2">
+                          <div
+                            class="bg-blue-600 h-2 rounded-full transition-all duration-500"
+                            style="width: {Math.round(((selectedUploadDetails.statistics.successful + selectedUploadDetails.statistics.failed) / selectedUploadDetails.statistics.totalDetected) * 100)}%"
+                          ></div>
+                        </div>
+                      {/if}
+                    </div>
+                  </div>
+                </div>
+              {/if}
+            {/if}
+
             <!-- Header with Stats -->
             <div class="rounded-2xl bg-card/50 backdrop-blur-sm p-6 shadow-sm">
               <div class="flex items-center justify-between mb-6">
-                <h2 class="text-2xl font-bold">{selectedUpload.fileName}</h2>
-                {#if selectedUploadDetails.statistics.failed > 0}
-                  <Button
-                    variant="outline"
-                    size="sm"
-                    on:click={() => retryProcessing(selectedUpload.uploadId)}
-                    disabled={reprocessing}
-                  >
-                    {#if reprocessing}
-                      <Loader2 class="w-4 h-4 mr-2 animate-spin" />
-                      Reprocessing...
-                    {:else}
-                      <RotateCw class="w-4 h-4 mr-2" />
-                      Retry Failed
+                <div>
+                  <h2 class="text-2xl font-bold">{selectedUpload.fileName}</h2>
+                  <div class="flex items-center gap-2 mt-1">
+                    {#if selectedUploadDetails.status === 'completed'}
+                      <span class="inline-flex items-center gap-1.5 px-2.5 py-1 rounded-full bg-green-100 text-green-700 text-xs font-medium">
+                        <CheckCircle class="w-3.5 h-3.5" />
+                        Completed
+                      </span>
+                    {:else if selectedUploadDetails.status === 'processing'}
+                      <span class="inline-flex items-center gap-1.5 px-2.5 py-1 rounded-full bg-blue-100 text-blue-700 text-xs font-medium">
+                        <Loader2 class="w-3.5 h-3.5 animate-spin" />
+                        Processing
+                      </span>
+                    {:else if selectedUploadDetails.status === 'partly_completed'}
+                      <span class="inline-flex items-center gap-1.5 px-2.5 py-1 rounded-full bg-yellow-100 text-yellow-700 text-xs font-medium">
+                        <AlertTriangle class="w-3.5 h-3.5" />
+                        Partly Completed
+                      </span>
+                    {:else if selectedUploadDetails.status === 'failed'}
+                      <span class="inline-flex items-center gap-1.5 px-2.5 py-1 rounded-full bg-red-100 text-red-700 text-xs font-medium">
+                        <XCircle class="w-3.5 h-3.5" />
+                        Failed
+                      </span>
                     {/if}
-                  </Button>
-                {/if}
+                  </div>
+                </div>
+                <div class="flex gap-2">
+                  {#if selectedUploadDetails.status !== 'completed'}
+                    <Button
+                      variant="outline"
+                      size="sm"
+                      on:click={() => retryProcessing(selectedUpload.uploadId)}
+                      disabled={reprocessing}
+                    >
+                      {#if reprocessing}
+                        <Loader2 class="w-4 h-4 mr-2 animate-spin" />
+                        Reprocessing...
+                      {:else}
+                        <RotateCw class="w-4 h-4 mr-2" />
+                        Redo All
+                      {/if}
+                    </Button>
+                  {/if}
+                </div>
               </div>
               
-              <div class="grid grid-cols-2 md:grid-cols-4 gap-4">
+              <div class="grid grid-cols-2 md:grid-cols-5 gap-4">
                 <div class="relative overflow-hidden rounded-xl bg-gradient-to-br from-slate-50 to-slate-100 p-4">
                   <div class="absolute top-0 right-0 -mt-4 -mr-4 h-20 w-20 rounded-full bg-slate-200/50"></div>
                   <div class="relative">
@@ -419,7 +558,17 @@
                     <p class="text-3xl font-bold text-slate-700">{selectedUploadDetails.statistics.totalDetected}</p>
                   </div>
                 </div>
-                
+
+                {#if selectedUploadDetails.statistics.processing > 0}
+                  <div class="relative overflow-hidden rounded-xl bg-gradient-to-br from-blue-50 to-blue-100 p-4">
+                    <div class="absolute top-0 right-0 -mt-4 -mr-4 h-20 w-20 rounded-full bg-blue-200/50"></div>
+                    <div class="relative">
+                      <p class="text-xs font-medium text-blue-700 mb-1">Processing</p>
+                      <p class="text-3xl font-bold text-blue-600">{selectedUploadDetails.statistics.processing}</p>
+                    </div>
+                  </div>
+                {/if}
+
                 <div class="relative overflow-hidden rounded-xl bg-gradient-to-br from-green-50 to-green-100 p-4">
                   <div class="absolute top-0 right-0 -mt-4 -mr-4 h-20 w-20 rounded-full bg-green-200/50"></div>
                   <div class="relative">
@@ -427,7 +576,7 @@
                     <p class="text-3xl font-bold text-green-600">{selectedUploadDetails.statistics.successful}</p>
                   </div>
                 </div>
-                
+
                 <div class="relative overflow-hidden rounded-xl bg-gradient-to-br from-yellow-50 to-yellow-100 p-4">
                   <div class="absolute top-0 right-0 -mt-4 -mr-4 h-20 w-20 rounded-full bg-yellow-200/50"></div>
                   <div class="relative">
@@ -437,7 +586,7 @@
                     </p>
                   </div>
                 </div>
-                
+
                 <div class="relative overflow-hidden rounded-xl bg-gradient-to-br from-red-50 to-red-100 p-4">
                   <div class="absolute top-0 right-0 -mt-4 -mr-4 h-20 w-20 rounded-full bg-red-200/50"></div>
                   <div class="relative">
@@ -634,16 +783,37 @@
                         <div class="flex items-start justify-between gap-2 mb-3">
                           <div>
                             <h4 class="font-semibold text-lg">
-                              {receipt.storeName || 'Unknown Merchant'}
+                              {receipt.storeName || (receipt.status === 'pending' ? 'Analyzing...' : 'Unknown Merchant')}
                             </h4>
                             <p class="text-sm text-muted-foreground">
                               Receipt #{receipt.id}
+                              {#if receipt.status === 'pending'}
+                                <span class="ml-2 inline-flex items-center gap-1 text-blue-600">
+                                  <Loader2 class="w-3 h-3 animate-spin" />
+                                  analyzing...
+                                </span>
+                              {/if}
                             </p>
                           </div>
-                          <div class="text-right">
+                          <div class="flex items-center gap-2">
                             <span class="px-3 py-1.5 text-xs font-semibold rounded-full {badge.color}">
                               {badge.text}
                             </span>
+                            {#if receipt.status === 'failed' || receipt.status === 'unreadable' || (receipt.status === 'processed' && hasWarnings)}
+                              <button
+                                class="p-1.5 rounded-lg text-orange-600 hover:text-orange-700 hover:bg-orange-50 transition-colors"
+                                on:click|stopPropagation={() => retrySingleReceipt(selectedUpload.uploadId, receipt.id)}
+                                disabled={reprocessingReceipts.has(receipt.id)}
+                                aria-label="Retry this receipt"
+                                title="Retry this receipt"
+                              >
+                                {#if reprocessingReceipts.has(receipt.id)}
+                                  <Loader2 class="w-4 h-4 animate-spin" />
+                                {:else}
+                                  <RotateCw class="w-4 h-4" />
+                                {/if}
+                              </button>
+                            {/if}
                           </div>
                         </div>
 
@@ -664,24 +834,65 @@
                       {/if}
 
                       {#if receipt.lineItems && receipt.lineItems.length > 0}
+                        {@const products = receipt.lineItems.filter(i => !i.itemType || i.itemType === 'product')}
+                        {@const discounts = receipt.lineItems.filter(i => i.itemType === 'discount')}
+                        {@const otherItems = receipt.lineItems.filter(i => i.itemType && i.itemType !== 'product' && i.itemType !== 'discount')}
+                        
                         <div class="mt-3 border-t pt-3">
                           <p class="text-sm font-medium mb-2">Items ({receipt.lineItems.length})</p>
                           <div class="space-y-1 max-h-40 overflow-y-auto">
-                            {#each receipt.lineItems as item}
+                            
+                            <!-- Products -->
+                            {#each products as item}
                               {@const itemTotal = typeof item.totalPrice === 'string' ? parseFloat(item.totalPrice) : (item.totalPrice || 0)}
                               {@const itemQuantity = typeof item.amount === 'string' ? parseFloat(item.amount) : (item.amount || 1)}
                               {@const itemUnit = item.unit || ''}
+                              {@const itemUnitPrice = item.pricePerUnit ? parseFloat(item.pricePerUnit) : null}
                               {@const shouldShowQuantity = itemQuantity > 1 && itemUnit !== 'g' && itemUnit !== 'ml'}
                               <div class="flex justify-between text-sm">
                                 <span class="text-muted-foreground">
                                   {item.description || 'Unknown item'}
-                                  {#if shouldShowQuantity}
+                                  {#if shouldShowQuantity && itemUnitPrice}
+                                    <span class="text-xs ml-1">({itemQuantity} × {formatCurrency(itemUnitPrice, receipt.currency)})</span>
+                                  {:else if shouldShowQuantity}
                                     <span class="text-xs ml-1">(×{itemQuantity}{itemUnit ? ' ' + itemUnit : ''})</span>
                                   {/if}
                                 </span>
                                 <span class="font-medium">{formatCurrency(itemTotal, receipt.currency)}</span>
                               </div>
                             {/each}
+                            
+                            <!-- Discounts (highlighted in green) -->
+                            {#each discounts as item}
+                              {@const itemTotal = typeof item.totalPrice === 'string' ? parseFloat(item.totalPrice) : (item.totalPrice || 0)}
+                              <div class="flex justify-between text-sm text-green-600 dark:text-green-400">
+                                <span class="flex items-center gap-1">
+                                  <svg class="w-3 h-3" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                    <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M7 7h.01M7 3h5c.512 0 1.024.195 1.414.586l7 7a2 2 0 010 2.828l-7 7a2 2 0 01-2.828 0l-7-7A1.994 1.994 0 013 12V7a4 4 0 014-4z"></path>
+                                  </svg>
+                                  {item.description || 'Discount'}
+                                  {#if item.discountMetadata?.type === 'percentage' && item.discountMetadata?.value}
+                                    <span class="text-xs">({item.discountMetadata.value}%)</span>
+                                  {:else if item.discountMetadata?.code}
+                                    <span class="text-xs">({item.discountMetadata.code})</span>
+                                  {/if}
+                                </span>
+                                <span class="font-medium">{formatCurrency(itemTotal, receipt.currency)}</span>
+                              </div>
+                            {/each}
+                            
+                            <!-- Other items (tax, fees, tips) -->
+                            {#each otherItems as item}
+                              {@const itemTotal = typeof item.totalPrice === 'string' ? parseFloat(item.totalPrice) : (item.totalPrice || 0)}
+                              <div class="flex justify-between text-sm text-blue-600 dark:text-blue-400">
+                                <span class="flex items-center gap-1">
+                                  <span class="text-xs uppercase bg-blue-100 dark:bg-blue-900 px-1 rounded">{item.itemType}</span>
+                                  {item.description || 'Other'}
+                                </span>
+                                <span class="font-medium">{formatCurrency(itemTotal, receipt.currency)}</span>
+                              </div>
+                            {/each}
+                            
                           </div>
                         </div>
                       {/if}
@@ -704,7 +915,7 @@
                                           {#each warning.metadata.details.items as item}
                                             <div class="flex justify-between">
                                               <span>{item.description}</span>
-                                              <span class="font-medium">{formatCurrency(item.price, receipt.currency)}</span>
+                                              <span class="font-medium">{formatCurrency(item.lineTotal, receipt.currency)}</span>
                                             </div>
                                           {/each}
                                           <div class="border-t border-orange-200 pt-1 mt-1 flex justify-between font-medium">
@@ -736,7 +947,7 @@
                           </div>
                         {/if}
 
-                        {#if !receipt.storeName && !receipt.totalAmount}
+                        {#if !receipt.storeName && !receipt.totalAmount && receipt.status !== 'pending'}
                           <div class="mt-3 px-3 py-2 bg-red-50 rounded-lg text-sm text-destructive flex items-start gap-2">
                             <XCircle class="w-4 h-4 flex-shrink-0 mt-0.5" />
                             <span>Failed to process this receipt</span>

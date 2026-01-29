@@ -213,8 +213,9 @@
           <ul class="space-y-1 text-sm text-muted-foreground">
             <li>• Item Description</li>
             <li>• Quantity</li>
-            <li>• Unit Price</li>
-            <li>• Total Price</li>
+            <li>• Unit (pc, kg, L, etc.)</li>
+            <li>• Unit Price (per-unit price)</li>
+            <li>• Total Price (quantity × unit price)</li>
             <li>• Item Keywords</li>
             <li>• Associated Receipt ID</li>
           </ul>

@@ -71,11 +71,20 @@
     }
   }
 
-  function getStatusText(status: string): string {
+  function getStatusText(status: string, result?: any): string {
     switch (status) {
       case 'pending': return 'Queued';
       case 'uploading': return 'Uploading...';
-      case 'processing': return 'Processing...';
+      case 'processing': {
+        if (result?.statistics) {
+          const stats = result.statistics;
+          const done = stats.successful + stats.failed;
+          if (stats.totalDetected > 0) {
+            return `Analyzing receipts (${done}/${stats.totalDetected})...`;
+          }
+        }
+        return 'Processing on server...';
+      }
       case 'success': return 'Complete';
       case 'error': return 'Failed';
       default: return status;
@@ -274,9 +283,31 @@
                   <div class="flex-1 min-w-0">
                     <p class="font-semibold truncate">{upload.file.name}</p>
                     <p class="text-sm text-muted-foreground mt-0.5">
-                      {formatFileSize(upload.file.size)} • {getStatusText(upload.status)}
+                      {formatFileSize(upload.file.size)} • {getStatusText(upload.status, upload.result)}
                     </p>
                     
+                    {#if upload.status === 'processing' && upload.result?.statistics}
+                      <div class="mt-2 flex items-center gap-2 text-sm">
+                        {#if upload.result.statistics.totalDetected > 0}
+                          <span class="inline-flex items-center gap-1.5 px-2.5 py-1 rounded-full bg-blue-100 text-blue-700 font-medium">
+                            <Loader2 class="w-3.5 h-3.5 animate-spin" />
+                            {upload.result.statistics.totalDetected} detected
+                          </span>
+                          {#if upload.result.statistics.successful > 0}
+                            <span class="inline-flex items-center gap-1.5 px-2.5 py-1 rounded-full bg-green-100 text-green-700 font-medium">
+                              <CheckCircle class="w-3.5 h-3.5" />
+                              {upload.result.statistics.successful} done
+                            </span>
+                          {/if}
+                        {:else}
+                          <span class="inline-flex items-center gap-1.5 px-2.5 py-1 rounded-full bg-blue-100 text-blue-700 font-medium">
+                            <Loader2 class="w-3.5 h-3.5 animate-spin" />
+                            Detecting receipts...
+                          </span>
+                        {/if}
+                      </div>
+                    {/if}
+
                     {#if upload.status === 'error' && upload.error}
                       <div class="mt-2 px-3 py-1.5 rounded-lg bg-destructive/10 text-sm text-destructive">
                         {upload.error}
