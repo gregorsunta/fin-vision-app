@@ -333,6 +333,17 @@ function createReceiptQueueStore() {
       }
     },
     
+    // Update statistics for a specific upload (sync sidebar with API data)
+    updateUploadStatistics: (uploadId: number, statistics: CompletedUpload['statistics']) => {
+      update(state => {
+        const newCompleted = state.completedUploads.map(u =>
+          u.uploadId === uploadId ? { ...u, statistics } : u
+        );
+        saveCompletedUploads(newCompleted);
+        return { ...state, completedUploads: newCompleted };
+      });
+    },
+
     // Clear all data (call on logout)
     clearAllData: () => {
       console.log('🧹 Clearing all receipt queue data');

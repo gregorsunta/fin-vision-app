@@ -162,7 +162,7 @@ class ApiClient {
 
   async downloadCSV() {
     const { accessToken } = get(authStore);
-    
+
     const response = await fetch(`${API_BASE_URL}/users/me/receipts/export-csv`, {
       method: 'GET',
       headers: {
@@ -174,6 +174,44 @@ class ApiClient {
     if (!response.ok) {
       const data = await response.json();
       throw new ApiError(response.status, data.error || data.message || 'Failed to export CSV');
+    }
+
+    return response.blob();
+  }
+
+  async downloadItemsCSV() {
+    const { accessToken } = get(authStore);
+
+    const response = await fetch(`${API_BASE_URL}/users/me/items/export-csv`, {
+      method: 'GET',
+      headers: {
+        'Authorization': `Bearer ${accessToken}`,
+      },
+      credentials: 'include',
+    });
+
+    if (!response.ok) {
+      const data = await response.json();
+      throw new ApiError(response.status, data.error || data.message || 'Failed to export items CSV');
+    }
+
+    return response.blob();
+  }
+
+  async downloadUploadsCSV() {
+    const { accessToken } = get(authStore);
+
+    const response = await fetch(`${API_BASE_URL}/users/me/uploads/export-csv`, {
+      method: 'GET',
+      headers: {
+        'Authorization': `Bearer ${accessToken}`,
+      },
+      credentials: 'include',
+    });
+
+    if (!response.ok) {
+      const data = await response.json();
+      throw new ApiError(response.status, data.error || data.message || 'Failed to export uploads CSV');
     }
 
     return response.blob();

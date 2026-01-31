@@ -1,10 +1,11 @@
 <script lang="ts">
   import { onMount, onDestroy } from 'svelte';
+  import { slide } from 'svelte/transition';
   import { receiptQueue } from '$lib/stores/receiptQueue';
   import { apiClient } from '$lib/api/client';
   import Card from '$lib/components/Card.svelte';
   import Button from '$lib/components/Button.svelte';
-  import { CheckCircle, AlertCircle, XCircle, Loader2, Image as ImageIcon, ZoomIn, RotateCw, X, AlertTriangle } from 'lucide-svelte';
+  import { CheckCircle, AlertCircle, XCircle, Loader2, Image as ImageIcon, ZoomIn, RotateCw, X, AlertTriangle, ChevronDown } from 'lucide-svelte';
   
   let selectedUpload: any = null;
   let selectedUploadDetails: any = null;
@@ -15,6 +16,7 @@
   let reprocessingReceipts = new Set<number>();
   let showDebug = false;
   let pollingInterval: ReturnType<typeof setInterval> | null = null;
+  let expandedReceiptId: number | null = null;
 
   function extractFilename(urlOrFilename: string | null | undefined): string | null {
     if (!urlOrFilename) {
@@ -60,6 +62,7 @@
   async function selectUpload(upload: any) {
     selectedUpload = upload;
     selectedUploadDetails = null;
+    expandedReceiptId = null;
     loadingDetails = true;
 
     try {
@@ -107,7 +110,12 @@
       }
       
       selectedUploadDetails = details;
-      
+
+      // Sync sidebar stats with fresh API data
+      if (details.statistics) {
+        receiptQueue.updateUploadStatistics(upload.uploadId, details.statistics);
+      }
+
       // Preload images
       if (details.images?.marked) {
         console.log('🖼️ Loading marked image:', details.images.marked);
@@ -285,6 +293,10 @@
             const details = await apiClient.getUpload(selectedUpload.uploadId);
             selectedUploadDetails = details;
 
+            if (details.statistics) {
+              receiptQueue.updateUploadStatistics(selectedUpload.uploadId, details.statistics);
+            }
+
             if (details.images?.marked) {
               const markedFilename = extractFilename(details.images.marked);
               if (markedFilename) loadImageUrl(markedFilename);
@@ -325,6 +337,19 @@
   $: sortedUploads = [...$receiptQueue.completedUploads].sort(
     (a, b) => b.completedAt.getTime() - a.completedAt.getTime()
   );
+
+  $: sortedReceipts = selectedUploadDetails?.receipts?.all
+    ? [...selectedUploadDetails.receipts.all].sort((a: any, b: any) => {
+        const dateA = a.transactionDate ? new Date(a.transactionDate).getTime() : 0;
+        const dateB = b.transactionDate ? new Date(b.transactionDate).getTime() : 0;
+        if (dateA !== dateB) return dateB - dateA;
+        return (b.id || 0) - (a.id || 0);
+      })
+    : [];
+
+  function toggleReceiptExpand(receiptId: number) {
+    expandedReceiptId = expandedReceiptId === receiptId ? null : receiptId;
+  }
 </script>
 
 <div class="min-h-[calc(100vh-4rem)] bg-gradient-to-b from-background to-muted/20">
@@ -333,8 +358,7 @@
     <div class="mb-8">
       <div class="flex items-center justify-between">
         <div>
-          <h1 class="text-4xl font-bold tracking-tight">Receipt History</h1>
-          <p class="text-muted-foreground text-lg mt-2">View and manage all your processed receipts</p>
+          <h1 class="text-4xl font-bold tracking-tight">Uploads</h1>
         </div>
         <Button
           variant="outline"
@@ -351,10 +375,9 @@
       <!-- Left Sidebar: Upload List -->
       <div class="lg:col-span-1">
         <div class="sticky top-6">
-          <h2 class="text-lg font-semibold mb-4">Recent Uploads</h2>
           
           {#if sortedUploads.length === 0}
-            <div class="text-center py-12 px-4 rounded-2xl bg-card/50 backdrop-blur-sm">
+            <div class="text-center py-12 px-4 rounded-xl bg-card/50">
               <div class="inline-flex p-4 rounded-full bg-muted mb-4">
                 <ImageIcon class="w-8 h-8 text-muted-foreground" />
               </div>
@@ -362,52 +385,44 @@
               <p class="text-sm text-muted-foreground mt-1">Upload some receipts to get started</p>
             </div>
           {:else}
-            <div class="space-y-2 max-h-[calc(100vh-250px)] overflow-y-auto pr-2">
+            <div class="space-y-0.5 max-h-[calc(100vh-250px)] overflow-y-auto pr-2">
               {#each sortedUploads as upload (upload.uploadId)}
+                {@const isSelected = selectedUpload?.uploadId === upload.uploadId}
+                {@const stats = upload.statistics}
                 <button
-                  class="w-full text-left p-4 rounded-xl transition-all {selectedUpload?.uploadId === upload.uploadId
-                    ? 'bg-primary text-primary-foreground shadow-md'
-                    : 'bg-card/50 backdrop-blur-sm hover:bg-card hover:shadow-sm'}"
+                  class="w-full text-left px-3 py-2.5 rounded-lg transition-colors {isSelected
+                    ? 'bg-muted'
+                    : 'hover:bg-muted/50'}"
                   on:click={() => selectUpload(upload)}
                 >
-                <div class="flex items-start justify-between gap-2">
-                  <div class="flex-1 min-w-0">
-                    <p class="font-medium truncate">{upload.fileName}</p>
-                    <p class="text-xs text-muted-foreground">
-                      {formatDate(upload.completedAt)}
-                    </p>
+                  <div class="flex items-center justify-between gap-2">
+                    <p class="text-sm font-medium truncate flex-1 min-w-0">{upload.fileName}</p>
+                    <p class="text-xs text-muted-foreground whitespace-nowrap">{formatDate(upload.completedAt)}</p>
                   </div>
-                  <div class="text-right">
-                    <p class="text-sm font-semibold">{upload.statistics.totalDetected}</p>
-                    <p class="text-xs text-muted-foreground">receipt{upload.statistics.totalDetected !== 1 ? 's' : ''}</p>
-                    {#if upload.statistics.processing > 0}
-                      <Loader2 class="w-3 h-3 inline animate-spin text-blue-500 mt-0.5" />
+                  <div class="flex items-center gap-3 mt-1">
+                    <span class="inline-flex items-center gap-1 text-xs text-muted-foreground">
+                      <span class="w-2 h-2 rounded-full bg-slate-400"></span>
+                      {stats.totalDetected}
+                    </span>
+                    {#if stats.processing > 0}
+                      <span class="inline-flex items-center gap-1 text-xs text-muted-foreground">
+                        <span class="w-2 h-2 rounded-full bg-blue-500"></span>
+                        {stats.processing}
+                      </span>
+                    {/if}
+                    <span class="inline-flex items-center gap-1 text-xs text-muted-foreground">
+                      <span class="w-2 h-2 rounded-full bg-green-500"></span>
+                      {stats.successful}
+                    </span>
+                    {#if stats.failed > 0}
+                      <span class="inline-flex items-center gap-1 text-xs text-muted-foreground">
+                        <span class="w-2 h-2 rounded-full bg-red-500"></span>
+                        {stats.failed}
+                      </span>
                     {/if}
                   </div>
-                </div>
-                
-                <div class="mt-3 flex items-center gap-2 text-xs">
-                  {#if upload.statistics.successful > 0}
-                    <span class="flex items-center gap-1 text-green-600">
-                      <CheckCircle class="w-3 h-3" />
-                      {upload.statistics.successful}
-                    </span>
-                  {/if}
-                  {#if upload.statistics.failed > 0}
-                    <span class="flex items-center gap-1 text-destructive">
-                      <XCircle class="w-3 h-3" />
-                      {upload.statistics.failed}
-                    </span>
-                  {/if}
-                  {#if upload.statistics.processing > 0}
-                    <span class="flex items-center gap-1 text-blue-600">
-                      <Loader2 class="w-3 h-3 animate-spin" />
-                      {upload.statistics.processing}
-                    </span>
-                  {/if}
-                </div>
-              </button>
-            {/each}
+                </button>
+              {/each}
           </div>
         {/if}
       </div>
@@ -416,7 +431,7 @@
       <!-- Right Content: Upload Details -->
       <div class="lg:col-span-2">
         {#if !selectedUpload}
-          <div class="flex items-center justify-center h-[600px] rounded-2xl bg-card/50 backdrop-blur-sm">
+          <div class="flex items-center justify-center h-[600px] rounded-xl bg-card/50">
             <div class="text-center">
               <div class="inline-flex p-6 rounded-full bg-muted mb-4">
                 <ImageIcon class="w-12 h-12 text-muted-foreground" />
@@ -426,7 +441,7 @@
             </div>
           </div>
         {:else if loadingDetails}
-          <div class="flex items-center justify-center h-[600px] rounded-2xl bg-card/50 backdrop-blur-sm">
+          <div class="flex items-center justify-center h-[600px] rounded-xl bg-card/50">
             <div class="text-center">
               <Loader2 class="w-12 h-12 mx-auto mb-4 animate-spin text-primary" />
               <p class="text-muted-foreground">Loading receipt details...</p>
@@ -437,7 +452,7 @@
             
             <!-- Debug Panel -->
             {#if showDebug}
-              <div class="rounded-2xl bg-yellow-50 border-2 border-yellow-200 p-6 shadow-sm">
+              <div class="rounded-xl bg-yellow-50/80 p-6">
                 <h3 class="font-bold text-lg mb-4">🐛 Debug Information</h3>
                 <div class="space-y-2 text-sm">
                   <div>
@@ -471,7 +486,7 @@
               {@const updatedAt = new Date(selectedUploadDetails.updatedAt)}
               {@const isStuck = (Date.now() - updatedAt.getTime()) > 5 * 60 * 1000 && selectedUploadDetails.statistics.totalDetected === 0}
               {#if isStuck}
-                <div class="rounded-2xl bg-yellow-50 border-2 border-yellow-200 p-5 shadow-sm">
+                <div class="rounded-xl bg-yellow-50/80 p-5">
                   <div class="flex items-center gap-3">
                     <AlertTriangle class="w-6 h-6 text-yellow-600 flex-shrink-0" />
                     <div class="flex-1">
@@ -481,7 +496,7 @@
                   </div>
                 </div>
               {:else}
-                <div class="rounded-2xl bg-blue-50 border-2 border-blue-200 p-5 shadow-sm">
+                <div class="rounded-xl bg-blue-50/80 p-5">
                   <div class="flex items-center gap-3">
                     <Loader2 class="w-6 h-6 animate-spin text-blue-600 flex-shrink-0" />
                     <div class="flex-1">
@@ -501,307 +516,123 @@
               {/if}
             {/if}
 
-            <!-- Header with Stats -->
-            <div class="rounded-2xl bg-card/50 backdrop-blur-sm p-6 shadow-sm">
-              <div class="flex items-center justify-between mb-6">
-                <div>
-                  <h2 class="text-2xl font-bold">{selectedUpload.fileName}</h2>
-                  <div class="flex items-center gap-2 mt-1">
-                    {#if selectedUploadDetails.status === 'completed'}
-                      <span class="inline-flex items-center gap-1.5 px-2.5 py-1 rounded-full bg-green-100 text-green-700 text-xs font-medium">
-                        <CheckCircle class="w-3.5 h-3.5" />
-                        Completed
-                      </span>
-                    {:else if selectedUploadDetails.status === 'processing'}
-                      <span class="inline-flex items-center gap-1.5 px-2.5 py-1 rounded-full bg-blue-100 text-blue-700 text-xs font-medium">
-                        <Loader2 class="w-3.5 h-3.5 animate-spin" />
-                        Processing
-                      </span>
-                    {:else if selectedUploadDetails.status === 'partly_completed'}
-                      <span class="inline-flex items-center gap-1.5 px-2.5 py-1 rounded-full bg-yellow-100 text-yellow-700 text-xs font-medium">
-                        <AlertTriangle class="w-3.5 h-3.5" />
-                        Partly Completed
-                      </span>
-                    {:else if selectedUploadDetails.status === 'failed'}
-                      <span class="inline-flex items-center gap-1.5 px-2.5 py-1 rounded-full bg-red-100 text-red-700 text-xs font-medium">
-                        <XCircle class="w-3.5 h-3.5" />
-                        Failed
-                      </span>
-                    {/if}
-                  </div>
-                </div>
-                <div class="flex gap-2">
-                  {#if selectedUploadDetails.status !== 'completed'}
-                    <Button
-                      variant="outline"
-                      size="sm"
-                      on:click={() => retryProcessing(selectedUpload.uploadId)}
-                      disabled={reprocessing}
-                    >
-                      {#if reprocessing}
-                        <Loader2 class="w-4 h-4 mr-2 animate-spin" />
-                        Reprocessing...
-                      {:else}
-                        <RotateCw class="w-4 h-4 mr-2" />
-                        Redo All
-                      {/if}
-                    </Button>
-                  {/if}
-                </div>
-              </div>
-              
-              <div class="grid grid-cols-2 md:grid-cols-5 gap-4">
-                <div class="relative overflow-hidden rounded-xl bg-gradient-to-br from-slate-50 to-slate-100 p-4">
-                  <div class="absolute top-0 right-0 -mt-4 -mr-4 h-20 w-20 rounded-full bg-slate-200/50"></div>
-                  <div class="relative">
-                    <p class="text-xs font-medium text-muted-foreground mb-1">Detected</p>
-                    <p class="text-3xl font-bold text-slate-700">{selectedUploadDetails.statistics.totalDetected}</p>
-                  </div>
-                </div>
-
-                {#if selectedUploadDetails.statistics.processing > 0}
-                  <div class="relative overflow-hidden rounded-xl bg-gradient-to-br from-blue-50 to-blue-100 p-4">
-                    <div class="absolute top-0 right-0 -mt-4 -mr-4 h-20 w-20 rounded-full bg-blue-200/50"></div>
-                    <div class="relative">
-                      <p class="text-xs font-medium text-blue-700 mb-1">Processing</p>
-                      <p class="text-3xl font-bold text-blue-600">{selectedUploadDetails.statistics.processing}</p>
-                    </div>
-                  </div>
+            <!-- Slim Header -->
+            <div class="flex items-center justify-between rounded-xl bg-card/50 px-6 py-4">
+              <div class="flex items-center gap-3 min-w-0">
+                <h2 class="text-lg font-semibold truncate">{selectedUpload.fileName}</h2>
+                {#if selectedUploadDetails.status === 'completed'}
+                  <span class="inline-flex items-center gap-1.5 px-2.5 py-1 rounded-full bg-green-100 text-green-700 text-xs font-medium flex-shrink-0">
+                    <CheckCircle class="w-3.5 h-3.5" />
+                    Completed
+                  </span>
+                {:else if selectedUploadDetails.status === 'processing'}
+                  <span class="inline-flex items-center gap-1.5 px-2.5 py-1 rounded-full bg-blue-100 text-blue-700 text-xs font-medium flex-shrink-0">
+                    <Loader2 class="w-3.5 h-3.5 animate-spin" />
+                    Processing
+                  </span>
+                {:else if selectedUploadDetails.status === 'partly_completed'}
+                  <span class="inline-flex items-center gap-1.5 px-2.5 py-1 rounded-full bg-yellow-100 text-yellow-700 text-xs font-medium flex-shrink-0">
+                    <AlertTriangle class="w-3.5 h-3.5" />
+                    Partly Completed
+                  </span>
+                {:else if selectedUploadDetails.status === 'failed'}
+                  <span class="inline-flex items-center gap-1.5 px-2.5 py-1 rounded-full bg-red-100 text-red-700 text-xs font-medium flex-shrink-0">
+                    <XCircle class="w-3.5 h-3.5" />
+                    Failed
+                  </span>
                 {/if}
-
-                <div class="relative overflow-hidden rounded-xl bg-gradient-to-br from-green-50 to-green-100 p-4">
-                  <div class="absolute top-0 right-0 -mt-4 -mr-4 h-20 w-20 rounded-full bg-green-200/50"></div>
-                  <div class="relative">
-                    <p class="text-xs font-medium text-green-700 mb-1">Success</p>
-                    <p class="text-3xl font-bold text-green-600">{selectedUploadDetails.statistics.successful}</p>
-                  </div>
-                </div>
-
-                <div class="relative overflow-hidden rounded-xl bg-gradient-to-br from-yellow-50 to-yellow-100 p-4">
-                  <div class="absolute top-0 right-0 -mt-4 -mr-4 h-20 w-20 rounded-full bg-yellow-200/50"></div>
-                  <div class="relative">
-                    <p class="text-xs font-medium text-yellow-700 mb-1">With Issues</p>
-                    <p class="text-3xl font-bold text-yellow-600">
-                      {selectedUploadDetails.receipts.all.filter((r: any) => r.error && r.storeName).length}
-                    </p>
-                  </div>
-                </div>
-
-                <div class="relative overflow-hidden rounded-xl bg-gradient-to-br from-red-50 to-red-100 p-4">
-                  <div class="absolute top-0 right-0 -mt-4 -mr-4 h-20 w-20 rounded-full bg-red-200/50"></div>
-                  <div class="relative">
-                    <p class="text-xs font-medium text-red-700 mb-1">Failed</p>
-                    <p class="text-3xl font-bold text-red-600">{selectedUploadDetails.statistics.failed}</p>
-                  </div>
-                </div>
               </div>
+              <Button
+                variant="outline"
+                size="sm"
+                on:click={() => retryProcessing(selectedUpload.uploadId)}
+                disabled={reprocessing}
+              >
+                {#if reprocessing}
+                  <Loader2 class="w-4 h-4 mr-2 animate-spin" />
+                  Reprocessing...
+                {:else}
+                  <RotateCw class="w-4 h-4 mr-2" />
+                  Redo All
+                {/if}
+              </Button>
             </div>
 
-            <!-- Marked Image (Detection Rectangles) -->
-            {#if selectedUploadDetails.images.marked}
-              {@const markedFilename = extractFilename(selectedUploadDetails.images.marked)}
-              <div class="rounded-2xl bg-card/50 backdrop-blur-sm p-6 shadow-sm">
-                <div class="flex items-center gap-2 mb-4">
-                  <div class="p-2 rounded-lg bg-primary/10">
-                    <ImageIcon class="w-5 h-5 text-primary" />
-                  </div>
-                  <div>
-                    <h3 class="font-semibold">Detection Preview</h3>
-                    <p class="text-sm text-muted-foreground">Red rectangles show detected receipt boundaries</p>
-                  </div>
-                </div>
-                {#if markedFilename}
-                  {#await loadImageUrl(markedFilename)}
-                    <div class="bg-muted/50 rounded-xl h-64 flex items-center justify-center">
-                      <Loader2 class="w-8 h-8 animate-spin text-muted-foreground" />
-                    </div>
-                  {:then url}
-                    {#if url}
-                      <button
-                        class="relative group cursor-zoom-in w-full"
-                        on:click={() => selectedImageModal = url}
-                      >
-                        <img
-                          src={url}
-                          alt="Marked receipt"
-                          class="w-full rounded-xl shadow-sm"
-                        />
-                        <div class="absolute inset-0 bg-black/0 group-hover:bg-black/5 transition-colors rounded-xl flex items-center justify-center">
-                          <div class="p-3 rounded-full bg-black/50 opacity-0 group-hover:opacity-100 transition-opacity">
-                            <ZoomIn class="w-6 h-6 text-white" />
-                          </div>
-                        </div>
-                      </button>
-                    {:else}
-                      <div class="bg-red-50 rounded-xl p-4 text-center text-red-600">
-                        <XCircle class="w-8 h-8 mx-auto mb-2" />
-                        <p class="text-sm">Failed to load marked image</p>
-                      </div>
-                    {/if}
-                  {/await}
-                {:else}
-                  <div class="bg-yellow-50 rounded-xl p-4 text-center text-yellow-600">
-                    <AlertCircle class="w-8 h-8 mx-auto mb-2" />
-                    <p class="text-sm">No marked image filename found</p>
-                  </div>
-                {/if}
-              </div>
-            {/if}
-
-            <!-- Split Receipt Images -->
-            {#if selectedUploadDetails.images.splitReceipts && selectedUploadDetails.images.splitReceipts.length > 0}
-              <div class="rounded-2xl bg-card/50 backdrop-blur-sm p-6 shadow-sm">
-                <div class="flex items-center gap-2 mb-4">
-                  <div class="p-2 rounded-lg bg-primary/10">
-                    <ImageIcon class="w-5 h-5 text-primary" />
-                  </div>
-                  <div>
-                    <h3 class="font-semibold">Split Receipt Images</h3>
-                    <p class="text-sm text-muted-foreground">Individual receipt images extracted from the upload</p>
-                  </div>
-                </div>
-                <div class="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
-                  {#each selectedUploadDetails.images.splitReceipts as splitReceiptUrl, index}
-                    {@const filename = extractFilename(splitReceiptUrl)}
-                    {#if filename}
-                      {#await loadImageUrl(filename)}
-                        <div class="bg-muted/50 rounded-xl h-48 flex items-center justify-center">
-                          <Loader2 class="w-6 h-6 animate-spin text-muted-foreground" />
-                        </div>
-                      {:then url}
-                        {#if url}
-                          <button
-                            class="relative group cursor-zoom-in"
-                            on:click={() => selectedImageModal = url}
-                          >
-                            <img
-                              src={url}
-                              alt="Split receipt {index + 1}"
-                              class="w-full h-48 object-cover rounded-xl shadow-sm"
-                            />
-                            <div class="absolute inset-0 bg-black/0 group-hover:bg-black/10 transition-colors rounded-xl flex items-center justify-center">
-                              <div class="p-2 rounded-full bg-black/50 opacity-0 group-hover:opacity-100 transition-opacity">
-                                <ZoomIn class="w-5 h-5 text-white" />
-                              </div>
-                            </div>
-                            <div class="absolute bottom-2 left-2 px-2 py-1 bg-black/70 text-white text-xs rounded-md">
-                              Receipt {index + 1}
-                            </div>
-                          </button>
-                        {:else}
-                          <div class="bg-red-50 rounded-xl h-48 flex items-center justify-center">
-                            <div class="text-center">
-                              <XCircle class="w-6 h-6 mx-auto mb-1 text-red-600" />
-                              <p class="text-xs text-red-600">Failed to load</p>
-                            </div>
-                          </div>
-                        {/if}
-                      {/await}
-                    {/if}
-                  {/each}
-                </div>
-              </div>
-            {/if}
-
             <!-- Individual Receipts -->
-            <div>
-              <h2 class="text-2xl font-bold mb-4">Individual Receipts</h2>
-              <div class="grid gap-4">
-                {#each selectedUploadDetails.receipts.all as receipt, index (receipt.id)}
-                  {@const warnings = getValidationWarningsForReceipt(receipt.id)}
-                  {@const hasWarnings = warnings.length > 0}
-                  {@const badge = getStatusBadge(receipt, hasWarnings)}
-                  {@const filename = extractFilename(receipt.imageUrl)}
-                  {#if showDebug}
-                    <!-- Debug: Log receipt data -->
-                    {console.log(`🧾 Receipt #${receipt.id}:`, {
-                      storeName: receipt.storeName,
-                      totalAmount: receipt.totalAmount,
-                      totalAmountType: typeof receipt.totalAmount,
-                      currency: receipt.currency,
-                      currencyType: typeof receipt.currency,
-                      taxAmount: receipt.taxAmount,
-                      imageUrl: receipt.imageUrl,
-                      filename: filename,
-                      hasLineItems: !!receipt.lineItems,
-                      lineItemsCount: receipt.lineItems?.length || 0,
-                      sampleLineItem: receipt.lineItems?.[0],
-                      status: receipt.status,
-                      error: receipt.error,
-                      formattedTotal: formatCurrency(receipt.totalAmount, receipt.currency)
-                    })}
-                  {/if}
-                  <div class="rounded-2xl bg-card shadow-sm p-6 hover:shadow-md transition-shadow">
-                    <div class="flex items-start gap-6">
-                      <!-- Receipt Image -->
-                      {#if receipt.imageUrl && filename}
-                        {#await loadImageUrl(filename)}
-                          <div class="w-32 h-40 bg-muted/50 rounded-xl flex items-center justify-center flex-shrink-0">
-                            <Loader2 class="w-6 h-6 animate-spin text-muted-foreground" />
-                          </div>
-                        {:then url}
-                          {#if url}
-                            <button
-                              class="relative group cursor-zoom-in flex-shrink-0"
-                              on:click={() => selectedImageModal = url}
-                            >
-                              <img
-                                src={url}
-                                alt="Receipt {index + 1}"
-                                class="w-32 h-40 object-cover rounded-xl shadow-sm"
-                              />
-                              <div class="absolute inset-0 bg-black/0 group-hover:bg-black/10 transition-colors rounded-xl flex items-center justify-center">
-                                <div class="p-2 rounded-full bg-black/50 opacity-0 group-hover:opacity-100 transition-opacity">
-                                  <ZoomIn class="w-5 h-5 text-white" />
-                                </div>
-                              </div>
-                            </button>
-                          {:else}
-                            <div class="w-32 h-40 bg-red-50 rounded-xl flex items-center justify-center flex-shrink-0">
-                              <div class="text-center">
-                                <XCircle class="w-6 h-6 mx-auto mb-1 text-red-600" />
-                                <p class="text-xs text-red-600">Failed</p>
-                              </div>
-                            </div>
-                          {/if}
-                        {/await}
-                      {:else if receipt.imageUrl}
-                        <div class="w-32 h-40 bg-yellow-50 rounded-xl flex items-center justify-center flex-shrink-0">
-                          <div class="text-center">
-                            <AlertCircle class="w-6 h-6 mx-auto mb-1 text-yellow-600" />
-                            <p class="text-xs text-yellow-600">No image</p>
-                          </div>
-                        </div>
-                      {:else}
-                        <div class="w-32 h-40 bg-gray-100 rounded-xl flex items-center justify-center flex-shrink-0">
-                          <ImageIcon class="w-8 h-8 text-gray-400" />
-                        </div>
-                      {/if}
-
-                      <!-- Receipt Data -->
-                      <div class="flex-1 min-w-0">
-                        <div class="flex items-start justify-between gap-2 mb-3">
-                          <div>
-                            <h4 class="font-semibold text-lg">
-                              {receipt.storeName || (receipt.status === 'pending' ? 'Analyzing...' : 'Unknown Merchant')}
-                            </h4>
-                            <p class="text-sm text-muted-foreground">
-                              Receipt #{receipt.id}
-                              {#if receipt.status === 'pending'}
-                                <span class="ml-2 inline-flex items-center gap-1 text-blue-600">
-                                  <Loader2 class="w-3 h-3 animate-spin" />
-                                  analyzing...
-                                </span>
-                              {/if}
-                            </p>
-                          </div>
-                          <div class="flex items-center gap-2">
-                            <span class="px-3 py-1.5 text-xs font-semibold rounded-full {badge.color}">
-                              {badge.text}
-                            </span>
-                            {#if receipt.status === 'failed' || receipt.status === 'unreadable' || (receipt.status === 'processed' && hasWarnings)}
+            <div class="rounded-xl bg-card/50 overflow-hidden">
+              <div class="px-6 py-4">
+                <h2 class="text-lg font-semibold">Individual Receipts</h2>
+              </div>
+              <div class="overflow-x-auto">
+                <table class="w-full">
+                  <thead>
+                    <tr class="border-b border-border/30 text-xs font-medium text-muted-foreground uppercase tracking-wider">
+                      <th class="px-4 py-3 text-left w-10">#</th>
+                      <th class="px-4 py-3 text-left w-16">Status</th>
+                      <th class="px-4 py-3 text-left">Store</th>
+                      <th class="px-4 py-3 text-right">Total</th>
+                      <th class="px-4 py-3 text-left">Date</th>
+                      <th class="px-4 py-3 text-right w-20">Actions</th>
+                    </tr>
+                  </thead>
+                  <tbody>
+                    {#each sortedReceipts as receipt, index (receipt.id)}
+                      {@const warnings = getValidationWarningsForReceipt(receipt.id)}
+                      {@const hasWarnings = warnings.length > 0}
+                      {@const badge = getStatusBadge(receipt, hasWarnings)}
+                      {@const filename = extractFilename(receipt.imageUrl)}
+                      {@const isExpanded = expandedReceiptId === receipt.id}
+                      <!-- Summary Row -->
+                      <tr
+                        class="hover:bg-muted/20 cursor-pointer transition-colors {isExpanded ? 'bg-muted/20' : ''}"
+                        on:click={() => toggleReceiptExpand(receipt.id)}
+                      >
+                        <td class="px-4 py-3 text-sm text-muted-foreground">{index + 1}</td>
+                        <td class="px-4 py-3">
+                          <span class="inline-flex items-center gap-1.5 group/status relative" title={badge.text}>
+                            {#if receipt.status === 'pending'}
+                              <Loader2 class="w-4 h-4 animate-spin text-blue-500" />
+                            {:else if badge.text === 'Success'}
+                              <span class="w-2.5 h-2.5 rounded-full bg-green-500"></span>
+                            {:else if badge.text === 'Needs Review'}
+                              <AlertTriangle class="w-4 h-4 text-orange-500" />
+                            {:else if badge.text === 'Unreadable'}
+                              <span class="w-2.5 h-2.5 rounded-full bg-yellow-500"></span>
+                            {:else if badge.text === 'Failed'}
+                              <span class="w-2.5 h-2.5 rounded-full bg-red-500"></span>
+                            {:else}
+                              <span class="w-2.5 h-2.5 rounded-full bg-gray-400"></span>
+                            {/if}
+                            <span class="hidden group-hover/status:inline text-xs text-muted-foreground">{badge.text}</span>
+                          </span>
+                        </td>
+                        <td class="px-4 py-3">
+                          <span class="text-sm font-medium truncate block max-w-[200px]">
+                            {receipt.storeName || (receipt.status === 'pending' ? 'Analyzing...' : 'Unknown Merchant')}
+                          </span>
+                        </td>
+                        <td class="px-4 py-3 text-right">
+                          <span class="text-sm font-semibold">
+                            {#if receipt.totalAmount}
+                              {formatCurrency(receipt.totalAmount, receipt.currency)}
+                            {:else}
+                              <span class="text-muted-foreground">—</span>
+                            {/if}
+                          </span>
+                        </td>
+                        <td class="px-4 py-3">
+                          <span class="text-sm text-muted-foreground">
+                            {#if receipt.transactionDate}
+                              {new Date(receipt.transactionDate).toLocaleDateString()}
+                            {:else}
+                              —
+                            {/if}
+                          </span>
+                        </td>
+                        <td class="px-4 py-3 text-right">
+                          <div class="flex items-center justify-end gap-1">
                               <button
-                                class="p-1.5 rounded-lg text-orange-600 hover:text-orange-700 hover:bg-orange-50 transition-colors"
+                                class="p-1.5 rounded-lg text-muted-foreground hover:text-foreground hover:bg-muted transition-colors"
                                 on:click|stopPropagation={() => retrySingleReceipt(selectedUpload.uploadId, receipt.id)}
                                 disabled={reprocessingReceipts.has(receipt.id)}
                                 aria-label="Retry this receipt"
@@ -813,152 +644,329 @@
                                   <RotateCw class="w-4 h-4" />
                                 {/if}
                               </button>
-                            {/if}
+                            <button
+                              class="p-1.5 rounded-lg text-muted-foreground hover:text-foreground hover:bg-muted transition-all"
+                              on:click|stopPropagation={() => toggleReceiptExpand(receipt.id)}
+                              aria-label={isExpanded ? 'Collapse details' : 'Expand details'}
+                              title={isExpanded ? 'Collapse details' : 'Expand details'}
+                            >
+                              <ChevronDown class="w-4 h-4 transition-transform duration-[250ms] {isExpanded ? 'rotate-180' : ''}" />
+                            </button>
                           </div>
-                        </div>
+                        </td>
+                      </tr>
 
-                      {#if receipt.totalAmount}
-                        <div class="mb-3">
-                          <p class="text-2xl font-bold">{formatCurrency(receipt.totalAmount, receipt.currency)}</p>
-                          {#if receipt.taxAmount}
-                            <p class="text-sm text-muted-foreground">
-                              Tax: {formatCurrency(receipt.taxAmount, receipt.currency)}
-                            </p>
-                          {/if}
-                          {#if receipt.transactionDate}
-                            <p class="text-sm text-muted-foreground">
-                              {new Date(receipt.transactionDate).toLocaleDateString()}
-                            </p>
-                          {/if}
-                        </div>
-                      {/if}
-
-                      {#if receipt.lineItems && receipt.lineItems.length > 0}
-                        {@const products = receipt.lineItems.filter(i => !i.itemType || i.itemType === 'product')}
-                        {@const discounts = receipt.lineItems.filter(i => i.itemType === 'discount')}
-                        {@const otherItems = receipt.lineItems.filter(i => i.itemType && i.itemType !== 'product' && i.itemType !== 'discount')}
-                        
-                        <div class="mt-3 border-t pt-3">
-                          <p class="text-sm font-medium mb-2">Items ({receipt.lineItems.length})</p>
-                          <div class="space-y-1 max-h-40 overflow-y-auto">
-                            
-                            <!-- Products -->
-                            {#each products as item}
-                              {@const itemTotal = typeof item.totalPrice === 'string' ? parseFloat(item.totalPrice) : (item.totalPrice || 0)}
-                              {@const itemQuantity = typeof item.amount === 'string' ? parseFloat(item.amount) : (item.amount || 1)}
-                              {@const itemUnit = item.unit || ''}
-                              {@const itemUnitPrice = item.pricePerUnit ? parseFloat(item.pricePerUnit) : null}
-                              {@const shouldShowQuantity = itemQuantity > 1 && itemUnit !== 'g' && itemUnit !== 'ml'}
-                              <div class="flex justify-between text-sm">
-                                <span class="text-muted-foreground">
-                                  {item.description || 'Unknown item'}
-                                  {#if shouldShowQuantity && itemUnitPrice}
-                                    <span class="text-xs ml-1">({itemQuantity} × {formatCurrency(itemUnitPrice, receipt.currency)})</span>
-                                  {:else if shouldShowQuantity}
-                                    <span class="text-xs ml-1">(×{itemQuantity}{itemUnit ? ' ' + itemUnit : ''})</span>
-                                  {/if}
-                                </span>
-                                <span class="font-medium">{formatCurrency(itemTotal, receipt.currency)}</span>
-                              </div>
-                            {/each}
-                            
-                            <!-- Discounts (highlighted in green) -->
-                            {#each discounts as item}
-                              {@const itemTotal = typeof item.totalPrice === 'string' ? parseFloat(item.totalPrice) : (item.totalPrice || 0)}
-                              <div class="flex justify-between text-sm text-green-600 dark:text-green-400">
-                                <span class="flex items-center gap-1">
-                                  <svg class="w-3 h-3" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                                    <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M7 7h.01M7 3h5c.512 0 1.024.195 1.414.586l7 7a2 2 0 010 2.828l-7 7a2 2 0 01-2.828 0l-7-7A1.994 1.994 0 013 12V7a4 4 0 014-4z"></path>
-                                  </svg>
-                                  {item.description || 'Discount'}
-                                  {#if item.discountMetadata?.type === 'percentage' && item.discountMetadata?.value}
-                                    <span class="text-xs">({item.discountMetadata.value}%)</span>
-                                  {:else if item.discountMetadata?.code}
-                                    <span class="text-xs">({item.discountMetadata.code})</span>
-                                  {/if}
-                                </span>
-                                <span class="font-medium">{formatCurrency(itemTotal, receipt.currency)}</span>
-                              </div>
-                            {/each}
-                            
-                            <!-- Other items (tax, fees, tips) -->
-                            {#each otherItems as item}
-                              {@const itemTotal = typeof item.totalPrice === 'string' ? parseFloat(item.totalPrice) : (item.totalPrice || 0)}
-                              <div class="flex justify-between text-sm text-blue-600 dark:text-blue-400">
-                                <span class="flex items-center gap-1">
-                                  <span class="text-xs uppercase bg-blue-100 dark:bg-blue-900 px-1 rounded">{item.itemType}</span>
-                                  {item.description || 'Other'}
-                                </span>
-                                <span class="font-medium">{formatCurrency(itemTotal, receipt.currency)}</span>
-                              </div>
-                            {/each}
-                            
-                          </div>
-                        </div>
-                      {/if}
-
-                        {#if hasWarnings}
-                          <div class="mt-3 space-y-2">
-                            {#each warnings as warning}
-                              <div class="px-3 py-2 bg-orange-50 border border-orange-200 rounded-lg text-sm">
-                                <div class="flex items-start gap-2">
-                                  <AlertTriangle class="w-4 h-4 flex-shrink-0 mt-0.5 text-orange-600" />
-                                  <div class="flex-1">
-                                    <p class="font-medium text-orange-900">Validation Warning</p>
-                                    <p class="text-orange-800 mt-1">{formatPriceMismatchWarning(warning)}</p>
-                                    {#if warning.metadata?.details?.items}
-                                      <details class="mt-2">
-                                        <summary class="cursor-pointer text-xs text-orange-700 hover:text-orange-900">
-                                          View item breakdown
-                                        </summary>
-                                        <div class="mt-2 space-y-1 text-xs bg-white/50 p-2 rounded">
-                                          {#each warning.metadata.details.items as item}
-                                            <div class="flex justify-between">
-                                              <span>{item.description}</span>
-                                              <span class="font-medium">{formatCurrency(item.lineTotal, receipt.currency)}</span>
-                                            </div>
-                                          {/each}
-                                          <div class="border-t border-orange-200 pt-1 mt-1 flex justify-between font-medium">
-                                            <span>Calculated:</span>
-                                            <span>{formatCurrency(warning.metadata.details.calculatedSubtotal, receipt.currency)}</span>
-                                          </div>
-                                          <div class="flex justify-between font-medium">
-                                            <span>Receipt total:</span>
-                                            <span>{formatCurrency(warning.metadata.details.receiptSubtotal, receipt.currency)}</span>
-                                          </div>
-                                          <div class="flex justify-between font-bold text-orange-900">
-                                            <span>Difference:</span>
-                                            <span>{formatCurrency(Math.abs(parseFloat(warning.metadata.details.difference)), receipt.currency)}</span>
-                                          </div>
+                      <!-- Expanded Detail Row -->
+                      {#if isExpanded}
+                        <tr class="bg-muted/10">
+                          <td colspan="6" class="p-0">
+                            <div transition:slide={{ duration: 250 }}>
+                            <div class="px-6 py-5">
+                            <div class="flex items-start gap-6">
+                              <!-- Receipt Image -->
+                              {#if receipt.imageUrl && filename}
+                                {#await loadImageUrl(filename)}
+                                  <div class="w-32 h-40 bg-muted/50 rounded-xl flex items-center justify-center flex-shrink-0">
+                                    <Loader2 class="w-6 h-6 animate-spin text-muted-foreground" />
+                                  </div>
+                                {:then url}
+                                  {#if url}
+                                    <button
+                                      class="relative group cursor-zoom-in flex-shrink-0"
+                                      on:click|stopPropagation={() => selectedImageModal = url}
+                                    >
+                                      <img
+                                        src={url}
+                                        alt="Receipt {index + 1}"
+                                        class="w-32 h-40 object-cover rounded-xl shadow-sm"
+                                      />
+                                      <div class="absolute inset-0 bg-black/0 group-hover:bg-black/10 transition-colors rounded-xl flex items-center justify-center">
+                                        <div class="p-2 rounded-full bg-black/50 opacity-0 group-hover:opacity-100 transition-opacity">
+                                          <ZoomIn class="w-5 h-5 text-white" />
                                         </div>
-                                      </details>
-                                    {/if}
+                                      </div>
+                                    </button>
+                                  {:else}
+                                    <div class="w-32 h-40 bg-red-50 rounded-xl flex items-center justify-center flex-shrink-0">
+                                      <div class="text-center">
+                                        <XCircle class="w-6 h-6 mx-auto mb-1 text-red-600" />
+                                        <p class="text-xs text-red-600">Failed</p>
+                                      </div>
+                                    </div>
+                                  {/if}
+                                {/await}
+                              {:else if receipt.imageUrl}
+                                <div class="w-32 h-40 bg-yellow-50 rounded-xl flex items-center justify-center flex-shrink-0">
+                                  <div class="text-center">
+                                    <AlertCircle class="w-6 h-6 mx-auto mb-1 text-yellow-600" />
+                                    <p class="text-xs text-yellow-600">No image</p>
                                   </div>
                                 </div>
+                              {:else}
+                                <div class="w-32 h-40 bg-gray-100 rounded-xl flex items-center justify-center flex-shrink-0">
+                                  <ImageIcon class="w-8 h-8 text-gray-400" />
+                                </div>
+                              {/if}
+
+                              <!-- Receipt Details -->
+                              <div class="flex-1 min-w-0">
+                                <div class="flex items-start justify-between gap-2 mb-3">
+                                  <div>
+                                    <h4 class="font-semibold text-lg">
+                                      {receipt.storeName || (receipt.status === 'pending' ? 'Analyzing...' : 'Unknown Merchant')}
+                                    </h4>
+                                    <p class="text-sm text-muted-foreground">
+                                      Receipt #{receipt.id}
+                                      {#if receipt.status === 'pending'}
+                                        <span class="ml-2 inline-flex items-center gap-1 text-blue-600">
+                                          <Loader2 class="w-3 h-3 animate-spin" />
+                                          analyzing...
+                                        </span>
+                                      {/if}
+                                    </p>
+                                  </div>
+                                  <span class="px-3 py-1.5 text-xs font-semibold rounded-full {badge.color}">
+                                    {badge.text}
+                                  </span>
+                                </div>
+
+                                {#if receipt.totalAmount}
+                                  <div class="mb-3">
+                                    <p class="text-2xl font-bold">{formatCurrency(receipt.totalAmount, receipt.currency)}</p>
+                                    {#if receipt.taxAmount}
+                                      <p class="text-sm text-muted-foreground">
+                                        Tax: {formatCurrency(receipt.taxAmount, receipt.currency)}
+                                      </p>
+                                    {/if}
+                                    {#if receipt.transactionDate}
+                                      <p class="text-sm text-muted-foreground">
+                                        {new Date(receipt.transactionDate).toLocaleDateString()}
+                                      </p>
+                                    {/if}
+                                  </div>
+                                {/if}
+
+                                {#if receipt.lineItems && receipt.lineItems.length > 0}
+                                  {@const products = receipt.lineItems.filter(i => !i.itemType || i.itemType === 'product')}
+                                  {@const discounts = receipt.lineItems.filter(i => i.itemType === 'discount')}
+                                  {@const otherItems = receipt.lineItems.filter(i => i.itemType && i.itemType !== 'product' && i.itemType !== 'discount')}
+
+                                  <div class="mt-3 border-t border-border/20 pt-3">
+                                    <p class="text-sm font-medium mb-2">Items ({receipt.lineItems.length})</p>
+                                    <div class="space-y-1 max-h-40 overflow-y-auto">
+                                      {#each products as item}
+                                        {@const itemTotal = typeof item.totalPrice === 'string' ? parseFloat(item.totalPrice) : (item.totalPrice || 0)}
+                                        {@const itemQuantity = typeof item.amount === 'string' ? parseFloat(item.amount) : (item.amount || 1)}
+                                        {@const itemUnit = item.unit || ''}
+                                        {@const itemUnitPrice = item.pricePerUnit ? parseFloat(item.pricePerUnit) : null}
+                                        {@const shouldShowQuantity = itemQuantity > 1 && itemUnit !== 'g' && itemUnit !== 'ml'}
+                                        <div class="flex justify-between text-sm">
+                                          <span class="text-muted-foreground">
+                                            {item.description || 'Unknown item'}
+                                            {#if shouldShowQuantity && itemUnitPrice}
+                                              <span class="text-xs ml-1">({itemQuantity} × {formatCurrency(itemUnitPrice, receipt.currency)})</span>
+                                            {:else if shouldShowQuantity}
+                                              <span class="text-xs ml-1">(×{itemQuantity}{itemUnit ? ' ' + itemUnit : ''})</span>
+                                            {/if}
+                                          </span>
+                                          <span class="font-medium">{formatCurrency(itemTotal, receipt.currency)}</span>
+                                        </div>
+                                      {/each}
+
+                                      {#each discounts as item}
+                                        {@const itemTotal = typeof item.totalPrice === 'string' ? parseFloat(item.totalPrice) : (item.totalPrice || 0)}
+                                        <div class="flex justify-between text-sm text-green-600 dark:text-green-400">
+                                          <span class="flex items-center gap-1">
+                                            <svg class="w-3 h-3" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                              <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M7 7h.01M7 3h5c.512 0 1.024.195 1.414.586l7 7a2 2 0 010 2.828l-7 7a2 2 0 01-2.828 0l-7-7A1.994 1.994 0 013 12V7a4 4 0 014-4z"></path>
+                                            </svg>
+                                            {item.description || 'Discount'}
+                                            {#if item.discountMetadata?.type === 'percentage' && item.discountMetadata?.value}
+                                              <span class="text-xs">({item.discountMetadata.value}%)</span>
+                                            {:else if item.discountMetadata?.code}
+                                              <span class="text-xs">({item.discountMetadata.code})</span>
+                                            {/if}
+                                          </span>
+                                          <span class="font-medium">{formatCurrency(itemTotal, receipt.currency)}</span>
+                                        </div>
+                                      {/each}
+
+                                      {#each otherItems as item}
+                                        {@const itemTotal = typeof item.totalPrice === 'string' ? parseFloat(item.totalPrice) : (item.totalPrice || 0)}
+                                        <div class="flex justify-between text-sm text-blue-600 dark:text-blue-400">
+                                          <span class="flex items-center gap-1">
+                                            <span class="text-xs uppercase bg-blue-100 dark:bg-blue-900 px-1 rounded">{item.itemType}</span>
+                                            {item.description || 'Other'}
+                                          </span>
+                                          <span class="font-medium">{formatCurrency(itemTotal, receipt.currency)}</span>
+                                        </div>
+                                      {/each}
+                                    </div>
+                                  </div>
+                                {/if}
+
+                                {#if hasWarnings}
+                                  <div class="mt-3 space-y-2">
+                                    {#each warnings as warning}
+                                      <div class="px-3 py-2 bg-orange-50/80 rounded-lg text-sm">
+                                        <div class="flex items-start gap-2">
+                                          <AlertTriangle class="w-4 h-4 flex-shrink-0 mt-0.5 text-orange-600" />
+                                          <div class="flex-1">
+                                            <p class="font-medium text-orange-900">Validation Warning</p>
+                                            <p class="text-orange-800 mt-1">{formatPriceMismatchWarning(warning)}</p>
+                                            {#if warning.metadata?.details?.items}
+                                              <details class="mt-2">
+                                                <summary class="cursor-pointer text-xs text-orange-700 hover:text-orange-900">
+                                                  View item breakdown
+                                                </summary>
+                                                <div class="mt-2 space-y-1 text-xs bg-white/50 p-2 rounded">
+                                                  {#each warning.metadata.details.items as item}
+                                                    <div class="flex justify-between">
+                                                      <span>{item.description}</span>
+                                                      <span class="font-medium">{formatCurrency(item.lineTotal, receipt.currency)}</span>
+                                                    </div>
+                                                  {/each}
+                                                  <div class="border-t border-orange-200 pt-1 mt-1 flex justify-between font-medium">
+                                                    <span>Calculated:</span>
+                                                    <span>{formatCurrency(warning.metadata.details.calculatedSubtotal, receipt.currency)}</span>
+                                                  </div>
+                                                  <div class="flex justify-between font-medium">
+                                                    <span>Receipt total:</span>
+                                                    <span>{formatCurrency(warning.metadata.details.receiptSubtotal, receipt.currency)}</span>
+                                                  </div>
+                                                  <div class="flex justify-between font-bold text-orange-900">
+                                                    <span>Difference:</span>
+                                                    <span>{formatCurrency(Math.abs(parseFloat(warning.metadata.details.difference)), receipt.currency)}</span>
+                                                  </div>
+                                                </div>
+                                              </details>
+                                            {/if}
+                                          </div>
+                                        </div>
+                                      </div>
+                                    {/each}
+                                  </div>
+                                {/if}
+
+                                {#if receipt.error}
+                                  <div class="mt-3 px-3 py-2 bg-yellow-50 rounded-lg text-sm text-yellow-800 flex items-start gap-2">
+                                    <AlertCircle class="w-4 h-4 flex-shrink-0 mt-0.5" />
+                                    <span>{receipt.error}</span>
+                                  </div>
+                                {/if}
+
+                                {#if !receipt.storeName && !receipt.totalAmount && receipt.status !== 'pending'}
+                                  <div class="mt-3 px-3 py-2 bg-red-50 rounded-lg text-sm text-destructive flex items-start gap-2">
+                                    <XCircle class="w-4 h-4 flex-shrink-0 mt-0.5" />
+                                    <span>Failed to process this receipt</span>
+                                  </div>
+                                {/if}
                               </div>
-                            {/each}
-                          </div>
-                        {/if}
+                            </div>
+                            </div>
+                            <div class="border-b border-border/40"></div>
+                            </div>
+                          </td>
+                        </tr>
+                      {/if}
 
-                        {#if receipt.error}
-                          <div class="mt-3 px-3 py-2 bg-yellow-50 rounded-lg text-sm text-yellow-800 flex items-start gap-2">
-                            <AlertCircle class="w-4 h-4 flex-shrink-0 mt-0.5" />
-                            <span>{receipt.error}</span>
-                          </div>
-                        {/if}
-
-                        {#if !receipt.storeName && !receipt.totalAmount && receipt.status !== 'pending'}
-                          <div class="mt-3 px-3 py-2 bg-red-50 rounded-lg text-sm text-destructive flex items-start gap-2">
-                            <XCircle class="w-4 h-4 flex-shrink-0 mt-0.5" />
-                            <span>Failed to process this receipt</span>
-                          </div>
-                        {/if}
-                      </div>
-                    </div>
-                  </div>
-                {/each}
+                      <!-- Row separator -->
+                      {#if !isExpanded}
+                        <tr aria-hidden="true"><td colspan="6" class="p-0 border-b border-border/40"></td></tr>
+                      {/if}
+                    {/each}
+                  </tbody>
+                </table>
               </div>
             </div>
+
+            <!-- Detection Preview & Split Images -->
+            {#if selectedUploadDetails.images.marked || (selectedUploadDetails.images.splitReceipts && selectedUploadDetails.images.splitReceipts.length > 0)}
+              <div class="rounded-xl bg-card/50 p-6">
+                <div class="flex items-center gap-2 mb-4">
+                  <div class="p-2 rounded-lg bg-primary/10">
+                    <ImageIcon class="w-5 h-5 text-primary" />
+                  </div>
+                  <h3 class="font-semibold">Images</h3>
+                </div>
+
+                <div class="grid grid-cols-2 md:grid-cols-3 lg:grid-cols-4 gap-3">
+                  {#if selectedUploadDetails.images.marked}
+                    {@const markedFilename = extractFilename(selectedUploadDetails.images.marked)}
+                    {#if markedFilename}
+                      {#await loadImageUrl(markedFilename)}
+                        <div class="bg-muted/50 rounded-lg h-40 flex items-center justify-center">
+                          <Loader2 class="w-5 h-5 animate-spin text-muted-foreground" />
+                        </div>
+                      {:then url}
+                        {#if url}
+                          <button
+                            class="relative group cursor-zoom-in"
+                            on:click={() => selectedImageModal = url}
+                          >
+                            <img
+                              src={url}
+                              alt="Detection preview"
+                              class="w-full h-40 object-cover rounded-lg"
+                            />
+                            <div class="absolute inset-0 bg-black/0 group-hover:bg-black/10 transition-colors rounded-lg flex items-center justify-center">
+                              <div class="p-2 rounded-full bg-black/50 opacity-0 group-hover:opacity-100 transition-opacity">
+                                <ZoomIn class="w-4 h-4 text-white" />
+                              </div>
+                            </div>
+                            <div class="absolute bottom-1.5 left-1.5 px-1.5 py-0.5 bg-black/70 text-white text-[10px] rounded">
+                              Detection
+                            </div>
+                          </button>
+                        {:else}
+                          <div class="bg-red-50 rounded-lg h-40 flex items-center justify-center">
+                            <XCircle class="w-5 h-5 text-red-600" />
+                          </div>
+                        {/if}
+                      {/await}
+                    {/if}
+                  {/if}
+
+                  {#if selectedUploadDetails.images.splitReceipts}
+                    {#each selectedUploadDetails.images.splitReceipts as splitReceiptUrl, index}
+                      {@const filename = extractFilename(splitReceiptUrl)}
+                      {#if filename}
+                        {#await loadImageUrl(filename)}
+                          <div class="bg-muted/50 rounded-lg h-40 flex items-center justify-center">
+                            <Loader2 class="w-5 h-5 animate-spin text-muted-foreground" />
+                          </div>
+                        {:then url}
+                          {#if url}
+                            <button
+                              class="relative group cursor-zoom-in"
+                              on:click={() => selectedImageModal = url}
+                            >
+                              <img
+                                src={url}
+                                alt="Split receipt {index + 1}"
+                                class="w-full h-40 object-cover rounded-lg"
+                              />
+                              <div class="absolute inset-0 bg-black/0 group-hover:bg-black/10 transition-colors rounded-lg flex items-center justify-center">
+                                <div class="p-2 rounded-full bg-black/50 opacity-0 group-hover:opacity-100 transition-opacity">
+                                  <ZoomIn class="w-4 h-4 text-white" />
+                                </div>
+                              </div>
+                              <div class="absolute bottom-1.5 left-1.5 px-1.5 py-0.5 bg-black/70 text-white text-[10px] rounded">
+                                Receipt {index + 1}
+                              </div>
+                            </button>
+                          {:else}
+                            <div class="bg-red-50 rounded-lg h-40 flex items-center justify-center">
+                              <XCircle class="w-5 h-5 text-red-600" />
+                            </div>
+                          {/if}
+                        {/await}
+                      {/if}
+                    {/each}
+                  {/if}
+                </div>
+              </div>
+            {/if}
 
           </div>
         {/if}
